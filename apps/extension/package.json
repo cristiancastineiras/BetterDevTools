@@ -1,0 +1,42 @@
+{
+  "name": "extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox --mv3",
+    "build:chrome": "wxt build -b chrome",
+    "build:edge": "wxt build -b edge",
+    "build:firefox": "wxt build -b firefox --mv3 && web-ext lint -s .output/firefox-mv3 --self-hosted",
+    "zip": "pnpm zip:chrome && pnpm zip:edge && pnpm zip:firefox",
+    "zip:chrome": "wxt zip -b chrome",
+    "zip:edge": "wxt zip -b edge",
+    "zip:firefox": "wxt zip -b firefox --mv3 && web-ext lint -s .output/firefox-mv3 --self-hosted",
+    "typecheck": "tsc -p ./tsconfig.json",
+    "test:e2e": "playwright test",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "@betterdevtools/core": "workspace:*",
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@lucide/solid": "1.73.0",
+    "@solid-primitives/i18n": "3.0.0",
+    "@solidjs/web": "2.0.1",
+    "@tanstack/virtual-core": "3.19.11",
+    "solid-js": "2.0.1",
+    "valibot": "1.5.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.65.0",
+    "@solidjs/vite-plugin": "3.0.1",
+    "@tailwindcss/vite": "4.3.5",
+    "tailwindcss": "4.3.5",
+    "typescript": "6.0.3",
+    "vite": "8.3.8",
+    "web-ext": "10.8.0",
+    "wxt": "0.21.5"
+  }
+}

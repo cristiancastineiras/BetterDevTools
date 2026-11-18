@@ -1,0 +1,5 @@
+{
+  "printWidth": 140,
+  "singleQuote": true,
+  "ignorePatterns": ["pnpm-lock.yaml", "**/fixtures/**", "**/*.har"]
+}

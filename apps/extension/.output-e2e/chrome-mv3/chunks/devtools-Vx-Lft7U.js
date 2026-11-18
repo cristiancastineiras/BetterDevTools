@@ -1,0 +1,1 @@
+import{t as e}from"./browser-DKnVyUgM.js";e.devtools.panels.create(`BetterDevTools`,`icon/32.png`,`panel.html`);

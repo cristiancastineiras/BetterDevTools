@@ -1,0 +1,17 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Supply-chain guard: never resolve a version published less than 3 days ago.
+# Solid 2.0 shipped within the window, so only its official packages are exempted
+# (@solid-primitives/i18n 3.0 is the first release compatible with Solid 2).
+minimumReleaseAge: 4320
+minimumReleaseAgeExclude:
+  - solid-js
+  - '@solidjs/*'
+  - '@solid-primitives/i18n'
+saveExact: true
+
+# One Vite for WXT, the Solid plugin and Tailwind.
+overrides:
+  vite: 8.3.8

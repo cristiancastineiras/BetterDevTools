@@ -1,0 +1,36 @@
+{
+  "name": "betterdevtools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "format": "oxfmt",
+    "lint": "oxlint --deny-warnings && oxfmt --check",
+    "typecheck": "tsc -p packages/core && tsc -p tsconfig.test.json && pnpm -F extension typecheck",
+    "build:all": "pnpm build:chrome && pnpm build:edge && pnpm build:firefox",
+    "build:chrome": "pnpm -F extension build:chrome",
+    "build:edge": "pnpm -F extension build:edge",
+    "build:firefox": "pnpm -F extension build:firefox",
+    "zip:all": "pnpm zip:chrome && pnpm zip:edge && pnpm zip:firefox",
+    "zip:chrome": "pnpm -F extension zip:chrome",
+    "zip:edge": "pnpm -F extension zip:edge",
+    "zip:firefox": "pnpm -F extension zip:firefox",
+    "test": "vitest run",
+    "test:e2e": "pnpm -F extension test:e2e",
+    "bench": "node scripts/bench.ts"
+  },
+  "dependencies": {
+    "solid-sileo": "0.1.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "gpt-tokenizer": "4.1.2",
+    "oxfmt": "0.78.0",
+    "oxlint": "1.93.0",
+    "typescript": "6.0.3",
+    "vitest": "5.1.0"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "packageManager": "pnpm@10.28.2"
+}
