@@ -6,6 +6,7 @@
     "format": "oxfmt",
     "lint": "oxlint --deny-warnings && oxfmt --check",
     "typecheck": "tsc -p packages/core && tsc -p tsconfig.test.json && pnpm -F extension typecheck",
+    "build": "pnpm build:all",
     "build:all": "pnpm build:chrome && pnpm build:edge && pnpm build:firefox",
     "build:chrome": "pnpm -F extension build:chrome",
     "build:edge": "pnpm -F extension build:edge",

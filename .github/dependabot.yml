@@ -1,0 +1,9 @@
+# Keeps the pinned GitHub Actions (full commit SHAs) up to date, so a new version arrives as a reviewable pull request.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
