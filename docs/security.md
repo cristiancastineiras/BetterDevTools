@@ -54,6 +54,31 @@ acknowledgement. Header values that look secret are hidden in the inspector unti
   enable "Include credentials"; credentials are never written to history or collections.
 - File downloads use generated names (`betterdevtools-<timestamp>.<ext>`), never names from captured data.
 
+## API AutoDiscovery
+
+AutoDiscovery builds a map of an API from captured traffic without keeping the traffic. What a session
+holds (in memory, and in the extension's IndexedDB when saved) is structure and scrubbed examples:
+
+- **Full request and response bodies are never stored.** Each body is folded into a JSON Schema accumulator (types,
+  required/optional counts, formats) and dropped; the only trace of a body is the scrubbed example below.
+- **Header values are never read into the session**; only header names, plus the authorization scheme
+  (`bearer`, `basic`, `api-key`, `cookie`) so the OpenAPI document can describe it.
+- **Examples are scrubbed before they are stored**: secret-named fields (`password`, `token`, `authorization`,
+  `cookie`, `secret` …), JWTs, long token-like strings, emails, card numbers (Luhn-checked), IP addresses and
+  personal fields (`email`, `phone`, `firstName`, `address` …) are replaced, long strings are cut, arrays keep three
+  items. URLs lose credentials and fragments, and secret/personal query values and emails in the path are masked.
+- **Enum candidates** are only offered for small sets of values that repeat, never for fields that look personal
+  or secret, and never for values that look like numbers, emails or tokens.
+- The **values that link two requests** (a token returned by a login and sent later, an id) are held in a bounded
+  in-memory map to draw the dependency graph. They are not part of the session, so they are neither saved nor
+  exported; the graph keeps only where a value came from and where it went (for example `response $.token → header
+  authorization`).
+- Sessions are saved only in this browser, and can be deleted from the Sessions tab. Exports (OpenAPI, schemas,
+  TypeScript, Markdown, HTML report, graph) are built from the same scrubbed data.
+
+An end-to-end test imports traffic that contains a token, a password and an email, analyzes it, exports OpenAPI and reads
+back the saved session: none of those values appear in either.
+
 ## Known limits
 
 - `web-ext lint` reports one `UNSAFE_VAR_ASSIGNMENT`: Solid's runtime clones its own compile-time
