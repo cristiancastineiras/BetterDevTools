@@ -44,7 +44,7 @@ function formatOf(text: string): string | null {
 
 /** Field names whose values are personal or credentials: never remembered, so never enum candidates.*/
 const PERSONAL_NAME =
-  /(e-?mail|phone|mobile|tel|address|street|city|zip|postal|name|surname|birth|dni|nif|ssn|iban|card|passport|password|salary|ip|lat|lng|lon|user|login|owner|author|customer|client|account|contact)/i;
+  /(e-?mail|phone|mobile|address|street|city|zip|postal|name|surname|birth|dni|nif|ssn|iban|card|passport|password|salary|lat|lng|user|login|owner|author|customer|client|account|contact)/i;
 
 const ENUM_BLOCK = /@|^\+?\d[\d\s-]{6,}$|^[A-Za-z0-9+/_-]{24,}$|\d{4,}/;
 
@@ -74,7 +74,8 @@ export function observeValue(acc: SchemaAcc, value: unknown, depth = 0, name = '
       const format = formatOf(value);
       if (format) stats.formats[format] = (stats.formats[format] ?? 0) + 1;
       if (stats.values) {
-        if (!enumSafe(name, value) || (!(value in stats.values) && Object.keys(stats.values).length >= SCHEMA_LIMITS.enumValues)) stats.values = null;
+        if (!enumSafe(name, value) || (!(value in stats.values) && Object.keys(stats.values).length >= SCHEMA_LIMITS.enumValues))
+          stats.values = null;
         else stats.values[value] = (stats.values[value] ?? 0) + 1;
       }
       return;
@@ -148,7 +149,6 @@ export function mergeSchemaAcc(a: SchemaAcc, b: SchemaAcc): SchemaAcc {
 
 export type JsonSchema = { [key: string]: unknown };
 
-
 function nonNullTypes(acc: SchemaAcc): JsonType[] {
   const present = (Object.keys(acc.types) as JsonType[]).filter((type) => type !== 'null');
   // integers and other numbers are one JSON "number" when both were seen
@@ -159,14 +159,19 @@ function scalarSchema(type: JsonType, acc: SchemaAcc, name: string): JsonSchema 
   const schema: JsonSchema = { type };
   if (type !== 'string' || !acc.str) return schema;
   const total = acc.types.string ?? 0;
-  const [format, count] = Object.entries(acc.str.formats).sort((x, y) => y[1] - x[1])[0] ?? [];
+  const [format, count] = Object.entries(acc.str.formats).toSorted((x, y) => y[1] - x[1])[0] ?? [];
   if (format && count! >= total * 0.95) schema.format = format;
   const values = acc.str.values;
   if (values && !schema.format && !PERSONAL_NAME.test(name)) {
     const entries = Object.entries(values);
     // a candidate only when the same few values keep coming back
-    if (total >= SCHEMA_LIMITS.minEnumSamples && entries.length > 1 && entries.length <= SCHEMA_LIMITS.enumValues && entries.every(([value, c]) => c >= 2 && !ENUM_BLOCK.test(value))) {
-      schema.enum = entries.map(([value]) => value).sort();
+    if (
+      total >= SCHEMA_LIMITS.minEnumSamples &&
+      entries.length > 1 &&
+      entries.length <= SCHEMA_LIMITS.enumValues &&
+      entries.every(([value, c]) => c >= 2 && !ENUM_BLOCK.test(value))
+    ) {
+      schema.enum = entries.map(([value]) => value).toSorted();
       schema['x-enum-candidate'] = true;
     }
   }
@@ -211,7 +216,12 @@ function objectSchema(acc: SchemaAcc): JsonSchema {
   const properties: Record<string, JsonSchema> = {};
   for (const key of keys) properties[key] = toJsonSchema(props[key]!, key);
   const required = keys.filter((key) => props[key]!.n === count && count > 0);
-  return { type: 'object', properties, ...(required.length ? { required } : {}), ...(acc.obj!.capped ? { 'x-properties-truncated': true } : {}) };
+  return {
+    type: 'object',
+    properties,
+    ...(required.length ? { required } : {}),
+    ...(acc.obj!.capped ? { 'x-properties-truncated': true } : {}),
+  };
 }
 
 /** The schema of a whole body: the inferred schema with a note of what it was inferred from. */
@@ -243,7 +253,7 @@ export function schemaFingerprint(schema: JsonSchema): string {
       : typeof value === 'object' && value
         ? Object.fromEntries(
             Object.entries(value)
-              .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+              .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
               .map(([key, child]) => [key, key === 'required' || key === 'enum' ? (child as string[]).toSorted() : sort(child)]),
           )
         : value;
@@ -266,7 +276,8 @@ export function schemaFindings(acc: SchemaAcc, path = '$', out: SchemaFinding[] 
     for (const [key, prop] of Object.entries(acc.obj.props)) {
       const at = /^[A-Za-z_$][\w$]*$/.test(key) ? `${path}.${key}` : `${path}[${JSON.stringify(key)}]`;
       if (prop.n < acc.obj.count) out.push({ path: at, kind: 'sometimes-missing', detail: `${prop.n}/${acc.obj.count}` });
-      if ((prop.types.null ?? 0) > 0 && (prop.types.null ?? 0) < prop.n) out.push({ path: at, kind: 'nullable', detail: `${prop.types.null}/${prop.n}` });
+      if ((prop.types.null ?? 0) > 0 && (prop.types.null ?? 0) < prop.n)
+        out.push({ path: at, kind: 'nullable', detail: `${prop.types.null}/${prop.n}` });
       schemaFindings(prop, at, out, depth + 1);
     }
   }
@@ -309,7 +320,8 @@ export function validateSchema(schema: JsonSchema, value: unknown, path = '$', i
   }
   if (typeof value === 'string') {
     const enumValues = schema.enum as string[] | undefined;
-    if (enumValues && !enumValues.includes(value)) issues.push({ path, message: `value not among the observed ${enumValues.length} values` });
+    if (enumValues && !enumValues.includes(value))
+      issues.push({ path, message: `value not among the observed ${enumValues.length} values` });
     const format = schema.format as string | undefined;
     if (format && !FORMAT_CHECKS.get(format)?.test(value)) issues.push({ path, message: `expected ${format}` });
   } else if (Array.isArray(value) && schema.items) {
@@ -322,9 +334,11 @@ export function validateSchema(schema: JsonSchema, value: unknown, path = '$', i
       if (!(key in record)) issues.push({ path: `${path}.${key}`, message: 'required field missing' });
     }
     if (properties) {
-      for (const [key, child] of Object.entries(properties)) if (key in record) validateSchema(child, record[key], `${path}.${key}`, issues, depth + 1);
+      for (const [key, child] of Object.entries(properties))
+        if (key in record) validateSchema(child, record[key], `${path}.${key}`, issues, depth + 1);
     } else if (schema.additionalProperties) {
-      for (const [key, child] of Object.entries(record).slice(0, SCHEMA_LIMITS.arraySamples)) validateSchema(schema.additionalProperties as JsonSchema, child, `${path}[${JSON.stringify(key)}]`, issues, depth + 1);
+      for (const [key, child] of Object.entries(record).slice(0, SCHEMA_LIMITS.arraySamples))
+        validateSchema(schema.additionalProperties as JsonSchema, child, `${path}[${JSON.stringify(key)}]`, issues, depth + 1);
     }
   }
   return issues;

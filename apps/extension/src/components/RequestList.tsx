@@ -40,7 +40,9 @@ type HideableKey = Exclude<ColumnKey, 'path'>;
 
 function toggleColumn(key: HideableKey) {
   updatePreferences((draft) => {
-    draft.hiddenColumns = draft.hiddenColumns.includes(key) ? draft.hiddenColumns.filter((hidden) => hidden !== key) : [...draft.hiddenColumns, key];
+    draft.hiddenColumns = draft.hiddenColumns.includes(key)
+      ? draft.hiddenColumns.filter((hidden) => hidden !== key)
+      : [...draft.hiddenColumns, key];
   });
 }
 
@@ -113,12 +115,16 @@ export default function RequestList(props: { onRowMenu: (at: { clientX: number; 
 
   // the columns in view, each with its place in the saved widths
   const columns = createMemo(() =>
-    COLUMNS.map((column, index) => ({ ...column, index })).filter((column) => !preferences.hiddenColumns.includes(column.key as HideableKey)),
+    COLUMNS.map((column, index) => ({ ...column, index })).filter(
+      (column) => !preferences.hiddenColumns.includes(column.key as HideableKey),
+    ),
   );
   // the path column takes the free space, so the list adapts when the details pane is resized
   const gridColumns = createMemo(() =>
     columns()
-      .map(({ index }) => (index === PATH_COLUMN ? `minmax(${preferences.columnWidths[index]}px, 1fr)` : `${preferences.columnWidths[index]}px`))
+      .map(({ index }) =>
+        index === PATH_COLUMN ? `minmax(${preferences.columnWidths[index]}px, 1fr)` : `${preferences.columnWidths[index]}px`,
+      )
       .join(' '),
   );
   // Rows are exactly as wide as the columns (or the panel, when that is wider): a long URL is

@@ -631,7 +631,8 @@ export const es: Dictionary = {
     fontWeight: 'Ancho (fino ↔ grueso)',
     reset: 'Restablecer ajustes',
     resetTitle: '¿Restablecer todos los ajustes?',
-    resetDetail: 'El tema, el idioma, el tamaño, las fuentes, los límites de captura, el ancho de las columnas y el resto de ajustes vuelven a sus valores por defecto. Tus peticiones, colecciones y espacios de trabajo no se tocan.',
+    resetDetail:
+      'El tema, el idioma, el tamaño, las fuentes, los límites de captura, el ancho de las columnas y el resto de ajustes vuelven a sus valores por defecto. Tus peticiones, colecciones y espacios de trabajo no se tocan.',
     resetDone: 'Ajustes restablecidos',
     fontDefault: 'Por defecto ({{ name }})',
     fontHint: 'Solo tienen efecto las fuentes instaladas en este equipo; si no, se usa la de por defecto.',
@@ -666,8 +667,10 @@ export const es: Dictionary = {
   },
   discovery: {
     title: 'API AutoDiscovery',
-    tagline: 'Navega por tu aplicación y BetterDevTools dibuja su API por ti: endpoints, esquemas inferidos, contratos y dependencias. No hay nada que importar, escribir ni configurar.',
-    privacy: 'Los tokens, cookies, credenciales y datos personales nunca se guardan. Una sesión conserva solo estructura y ejemplos depurados, y se queda en este navegador.',
+    tagline:
+      'Navega por tu aplicación y BetterDevTools dibuja su API por ti: endpoints, esquemas inferidos, contratos y dependencias. No hay nada que importar, escribir ni configurar.',
+    privacy:
+      'Los tokens, cookies, credenciales y datos personales nunca se guardan. Una sesión conserva solo estructura y ejemplos depurados, y se queda en este navegador.',
     emptyTitle: 'Cómo funciona',
     step1: 'Pulsa Iniciar grabación.',
     step2: 'Usa tu aplicación como lo haría un usuario: inicia sesión, abre páginas, crea cosas.',
@@ -704,7 +707,8 @@ export const es: Dictionary = {
     saveFailed: 'No se pudo guardar la sesión de descubrimiento',
     loadFailed: 'No se pudo abrir esa sesión de descubrimiento',
     navigatedTo: 'Página: {{page}}',
-    inferredNote: 'Inferido del tráfico observado, no es un contrato oficial: que un campo falte en las muestras no demuestra que sea opcional.',
+    inferredNote:
+      'Inferido del tráfico observado, no es un contrato oficial: que un campo falte en las muestras no demuestra que sea opcional.',
     noExample: 'No se capturó ningún ejemplo.',
     noBody: 'No se observó ningún cuerpo.',
     overview: {
@@ -754,7 +758,8 @@ export const es: Dictionary = {
       calls: '{{count}} llamadas',
       timing: 'media {{avg}} ms · p95 {{p95}} ms',
       size: 'mayor {{size}}',
-      incomplete: 'Algunas capturas estaban incompletas: {{unavailable}} sin cuerpo (el navegador no guardó ninguno), {{truncated}} truncadas, {{large}} demasiado grandes para analizar. Los esquemas solo cubren los cuerpos disponibles.',
+      incomplete:
+        'Algunas capturas estaban incompletas: {{unavailable}} sin cuerpo (el navegador no guardó ninguno), {{truncated}} truncadas, {{large}} demasiado grandes para analizar. Los esquemas solo cubren los cuerpos disponibles.',
       pathParams: 'Parámetros de ruta',
       query: 'Parámetros de query',
       optional: 'opcional',
@@ -786,8 +791,10 @@ export const es: Dictionary = {
     contracts: {
       discoveryMode: 'Modo descubrimiento',
       validationMode: 'Modo validación',
-      discoveryHint: 'Los esquemas siguen aprendiendo de cada respuesta. Congélalos cuando te parezcan correctos y las respuestas nuevas se comprobarán contra ese contrato en vez de modificarlo.',
-      validationHint: 'Contrato congelado el {{date}}. Las respuestas nuevas se comprueban contra él: un tipo cambiado o un campo obligatorio que falta aparece aquí como violación.',
+      discoveryHint:
+        'Los esquemas siguen aprendiendo de cada respuesta. Congélalos cuando te parezcan correctos y las respuestas nuevas se comprobarán contra ese contrato en vez de modificarlo.',
+      validationHint:
+        'Contrato congelado el {{date}}. Las respuestas nuevas se comprueban contra él: un tipo cambiado o un campo obligatorio que falta aparece aquí como violación.',
       freeze: 'Congelar contrato',
       freezeHint: 'Conserva los esquemas actuales como contrato y valida contra él las respuestas nuevas',
       unfreeze: 'Volver a descubrimiento',

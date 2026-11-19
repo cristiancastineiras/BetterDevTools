@@ -156,7 +156,9 @@ test('captures live traffic with bodies in real DevTools and keeps it across nav
 
     // API AutoDiscovery records what the page does from now on, and maps it into endpoints
     const click = (selector: string, text: string) =>
-      panel.eval(`[...document.querySelectorAll(${JSON.stringify(selector)})].find((e) => e.textContent.trim() === ${JSON.stringify(text)})?.click()`);
+      panel.eval(
+        `[...document.querySelectorAll(${JSON.stringify(selector)})].find((e) => e.textContent.trim() === ${JSON.stringify(text)})?.click()`,
+      );
     await click('[role=tab]', 'Discovery');
     await until(
       () => panel.eval(`document.body.textContent.includes('NOT RECORDING')`),
@@ -169,7 +171,9 @@ test('captures live traffic with bodies in real DevTools and keeps it across nav
       (shown) => shown === true,
       'discovery recording',
     );
-    await page.evaluate(() => Promise.all(['/api/users/101', '/api/users/202', '/api/users/303'].map((p) => fetch(p).then((r) => r.text()))));
+    await page.evaluate(() =>
+      Promise.all(['/api/users/101', '/api/users/202', '/api/users/303'].map((p) => fetch(p).then((r) => r.text()))),
+    );
     const discovered = await until(
       () => panel.eval(`[...document.querySelectorAll('[role=listbox] [role=option]')].map((o) => o.textContent)`) as Promise<string[]>,
       (options) => options.some((text) => text.includes('/api/users/{userId}') && text.includes('3 calls')),

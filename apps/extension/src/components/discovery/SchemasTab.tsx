@@ -19,7 +19,9 @@ export default function SchemasTab() {
   const text = () => {
     const component = selected();
     if (!component) return '';
-    return view() === 'types' ? `export interface ${component.name} ${schemaToTs(component.schema)}` : JSON.stringify(component.schema, null, 2);
+    return view() === 'types'
+      ? `export interface ${component.name} ${schemaToTs(component.schema)}`
+      : JSON.stringify(component.schema, null, 2);
   };
   const pick = (name: string) => setPicked(name);
 

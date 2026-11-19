@@ -42,7 +42,9 @@ describe('collection export', () => {
     expect(curl).toContain('# Set these before running: token');
     expect(curl).not.toContain('s3cret');
     expect(exportCollections(sample(), 'curl', { includeSecrets: true })).toContain("'Authorization: Bearer s3cret'");
-    expect(exportCollections(sample(), 'httpie', { includeSecrets: false })).toContain("http --ignore-stdin POST 'https://api.example.com/users?dry=1'");
+    expect(exportCollections(sample(), 'httpie', { includeSecrets: false })).toContain(
+      "http --ignore-stdin POST 'https://api.example.com/users?dry=1'",
+    );
   });
 
   it('describes operations in OpenAPI 3', () => {

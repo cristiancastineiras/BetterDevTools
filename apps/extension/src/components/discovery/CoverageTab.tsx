@@ -16,7 +16,14 @@ function Meter(props: { label: string; value: number; of: number; percent?: numb
           <span class="ms-1 text-fg-2">{percent()}%</span>
         </span>
       </div>
-      <div class="h-1.5 rounded-full bg-bg-3" role="progressbar" aria-label={props.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent()}>
+      <div
+        class="h-1.5 rounded-full bg-bg-3"
+        role="progressbar"
+        aria-label={props.label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent()}
+      >
         <div class="h-1.5 rounded-full bg-accent" style={{ width: `${percent()}%` }} />
       </div>
     </div>
@@ -60,7 +67,11 @@ export default function CoverageTab() {
             <Meter label={t('discovery.coverage.confidence')} value={data().endpoints - data().thin} of={data().endpoints} />
           </section>
           <Issues title={t('discovery.coverage.noSchema')} hint={t('discovery.coverage.noSchemaHint')} keys={data().noSchema} />
-          <Issues title={t('discovery.coverage.inconsistent')} hint={t('discovery.coverage.inconsistentHint')} keys={data().inconsistentKeys} />
+          <Issues
+            title={t('discovery.coverage.inconsistent')}
+            hint={t('discovery.coverage.inconsistentHint')}
+            keys={data().inconsistentKeys}
+          />
           <Issues title={t('discovery.coverage.erroring')} hint={t('discovery.coverage.erroringHint')} keys={data().erroring} />
           <Issues title={t('discovery.coverage.thin')} hint={t('discovery.coverage.thinHint')} keys={data().thinKeys} />
           <Issues title={t('discovery.coverage.unexercised')} hint={t('discovery.coverage.unexercisedHint')} keys={data().unexercised} />

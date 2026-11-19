@@ -5,13 +5,14 @@ import { currentModel, freezeContract, unfreezeContract } from '../../state/disc
 import IconButton from '../ui/IconButton.tsx';
 import { monoClass, sectionTitleClass } from '../ui/styles.ts';
 
+const model = () => currentModel();
+
 /**
  * Discovery mode learns and points out what is uneven; Validation mode freezes what was learned
  * as the contract and checks every new response against it, so a changed field shows as a
  * regression instead of silently widening the schema.
  */
 export default function ContractsTab() {
-  const model = () => currentModel();
   const frozen = () => model()?.state.frozen ?? null;
   const conflicts = createMemo(() => {
     const current = model();
@@ -26,10 +27,12 @@ export default function ContractsTab() {
         })),
       )
       .filter((entry) => entry.conflicts.length)
-      .sort((a, b) => b.conflicts.length - a.conflicts.length);
+      .toSorted((a, b) => b.conflicts.length - a.conflicts.length);
   });
   const checked = createMemo(() =>
-    (model()?.endpoints() ?? []).filter((endpoint) => endpoint.validation.checked > 0).sort((a, b) => b.validation.failed - a.validation.failed),
+    (model()?.endpoints() ?? [])
+      .filter((endpoint) => endpoint.validation.checked > 0)
+      .toSorted((a, b) => b.validation.failed - a.validation.failed),
   );
   const totals = createMemo(() => ({
     checked: checked().reduce((sum, endpoint) => sum + endpoint.validation.checked, 0),
@@ -42,7 +45,9 @@ export default function ContractsTab() {
         <div class="flex flex-col">
           <h3 class={sectionTitleClass}>{frozen() ? t('discovery.contracts.validationMode') : t('discovery.contracts.discoveryMode')}</h3>
           <p class="max-w-2xl text-fg-2">
-            {frozen() ? t('discovery.contracts.validationHint', { date: new Date(frozen()!.at).toLocaleString() }) : t('discovery.contracts.discoveryHint')}
+            {frozen()
+              ? t('discovery.contracts.validationHint', { date: new Date(frozen()!.at).toLocaleString() })
+              : t('discovery.contracts.discoveryHint')}
           </p>
         </div>
         <span class="ms-auto">
@@ -59,7 +64,12 @@ export default function ContractsTab() {
               />
             }
           >
-            <IconButton icon="undo" label={t('discovery.contracts.unfreezeHint')} text={t('discovery.contracts.unfreeze')} onClick={unfreezeContract} />
+            <IconButton
+              icon="undo"
+              label={t('discovery.contracts.unfreezeHint')}
+              text={t('discovery.contracts.unfreeze')}
+              onClick={unfreezeContract}
+            />
           </Show>
         </span>
       </section>
@@ -83,7 +93,10 @@ export default function ContractsTab() {
                       {endpoint.validation.failed ? '✗' : '✓'} {endpointLabel(endpoint)}
                       <span class="font-sans text-fg-2">
                         {' — '}
-                        {t('discovery.contracts.endpointSummary', { checked: endpoint.validation.checked, failed: endpoint.validation.failed })}
+                        {t('discovery.contracts.endpointSummary', {
+                          checked: endpoint.validation.checked,
+                          failed: endpoint.validation.failed,
+                        })}
                       </span>
                     </p>
                     <ul class="ms-4">

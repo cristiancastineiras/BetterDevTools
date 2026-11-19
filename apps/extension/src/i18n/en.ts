@@ -600,7 +600,7 @@ export const en = {
     userAgent: 'Replay user agent',
     userAgentDefault: 'Browser default',
     userAgentCustom: 'Custom',
-    userAgentPlaceholder: 'Empty = the browser\'s own user agent',
+    userAgentPlaceholder: "Empty = the browser's own user agent",
     userAgentHint:
       'Sent by Replay. With a custom user agent, replays go out from the extension and the browser asks for site access once. It does not change the page you are inspecting.',
     accent: 'Accent colour',
@@ -615,7 +615,8 @@ export const en = {
     fontWeight: 'Weight (thin ↔ bold)',
     reset: 'Reset settings',
     resetTitle: 'Reset all settings?',
-    resetDetail: 'Theme, language, size, fonts, capture limits, column widths and the other settings go back to their defaults. Your requests, collections and workspaces are not touched.',
+    resetDetail:
+      'Theme, language, size, fonts, capture limits, column widths and the other settings go back to their defaults. Your requests, collections and workspaces are not touched.',
     resetDone: 'Settings reset',
     fontDefault: 'Default ({{ name }})',
     fontHint: 'Only fonts installed on this computer take effect; otherwise the default is used.',
@@ -650,8 +651,10 @@ export const en = {
   },
   discovery: {
     title: 'API AutoDiscovery',
-    tagline: 'Navigate your application and BetterDevTools maps its API for you: endpoints, inferred schemas, contracts and dependencies. There is nothing to import, write or configure.',
-    privacy: 'Tokens, cookies, credentials and personal data are never stored. A session keeps structure and scrubbed examples only, and it stays in this browser.',
+    tagline:
+      'Navigate your application and BetterDevTools maps its API for you: endpoints, inferred schemas, contracts and dependencies. There is nothing to import, write or configure.',
+    privacy:
+      'Tokens, cookies, credentials and personal data are never stored. A session keeps structure and scrubbed examples only, and it stays in this browser.',
     emptyTitle: 'How it works',
     step1: 'Press Start recording.',
     step2: 'Use your application as a user would: log in, open pages, create things.',
@@ -738,7 +741,8 @@ export const en = {
       calls: '{{count}} calls',
       timing: 'avg {{avg}} ms · p95 {{p95}} ms',
       size: 'largest {{size}}',
-      incomplete: 'Some captures were incomplete: {{unavailable}} without a body (the browser kept none), {{truncated}} truncated, {{large}} too large to analyze. Schemas only cover the bodies that were available.',
+      incomplete:
+        'Some captures were incomplete: {{unavailable}} without a body (the browser kept none), {{truncated}} truncated, {{large}} too large to analyze. Schemas only cover the bodies that were available.',
       pathParams: 'Path parameters',
       query: 'Query parameters',
       optional: 'optional',
@@ -770,8 +774,10 @@ export const en = {
     contracts: {
       discoveryMode: 'Discovery mode',
       validationMode: 'Validation mode',
-      discoveryHint: 'The schemas keep learning from every response. Freeze them when they look right, and new responses are checked against that contract instead of changing it.',
-      validationHint: 'Contract frozen on {{date}}. New responses are checked against it: a changed type or a missing required field shows up here as a violation.',
+      discoveryHint:
+        'The schemas keep learning from every response. Freeze them when they look right, and new responses are checked against that contract instead of changing it.',
+      validationHint:
+        'Contract frozen on {{date}}. New responses are checked against it: a changed type or a missing required field shows up here as a violation.',
       freeze: 'Freeze contract',
       freezeHint: 'Keep the current schemas as the contract and validate new responses against it',
       unfreeze: 'Back to discovery',

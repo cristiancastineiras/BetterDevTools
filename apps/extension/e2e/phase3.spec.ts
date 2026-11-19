@@ -184,7 +184,9 @@ test('replay edits headers as a table with switches, in bulk too, and the body t
 test('big JSON: coloured at any size, and the tree finds, opens and filters matches anywhere', async ({ panel }) => {
   const users = Array.from({ length: 30_000 }, (_, i) => ({ id: i, name: `user ${i}`, city: i % 2 ? 'Madrid' : 'Lima' }));
   const body = JSON.stringify({ users });
-  const har = JSON.parse(HAR) as { log: { entries: { request: { url: string }; response: { content: { size: number; text: string } } }[] } };
+  const har = JSON.parse(HAR) as {
+    log: { entries: { request: { url: string }; response: { content: { size: number; text: string } } }[] };
+  };
   const entry = har.log.entries[0]!;
   entry.request.url = 'https://api.example.com/api/users';
   entry.response.content = { ...entry.response.content, size: body.length, text: body };

@@ -5,13 +5,14 @@ import { currentModel, discoveryStatus, markScenario } from '../../state/discove
 import IconButton from '../ui/IconButton.tsx';
 import { fieldClass, monoClass, sectionTitleClass } from '../ui/styles.ts';
 
+const scenarios = () => currentModel()?.state.scenarios ?? [];
+
 /**
  * The traffic grouped by what the user was doing: a scenario starts when the page navigates or when
  * the user marks one ("Login", "Create task"), so the map shows how the app really uses its API.
  */
 export default function ScenariosTab() {
   const [name, setName] = createSignal('');
-  const scenarios = () => currentModel()?.state.scenarios ?? [];
   const canMark = () => (discoveryStatus() === 'recording' || discoveryStatus() === 'paused') && name().trim() !== '';
 
   function mark(event: SubmitEvent) {
@@ -31,7 +32,13 @@ export default function ScenariosTab() {
           value={name()}
           onInput={(event) => setName(event.currentTarget.value)}
         />
-        <IconButton type="submit" icon="plus" label={t('discovery.scenarios.markHint')} text={t('discovery.scenarios.mark')} disabled={!canMark()} />
+        <IconButton
+          type="submit"
+          icon="plus"
+          label={t('discovery.scenarios.markHint')}
+          text={t('discovery.scenarios.mark')}
+          disabled={!canMark()}
+        />
       </form>
       <p class="max-w-2xl text-fg-2">{t('discovery.scenarios.hint')}</p>
       <Show when={scenarios().length} fallback={<p class="text-fg-2">{t('discovery.scenarios.none')}</p>}>

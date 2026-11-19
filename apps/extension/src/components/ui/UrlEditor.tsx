@@ -20,15 +20,17 @@ export default function UrlEditor(props: {
   /** The active environment's variables. */
   variables: () => readonly UrlEditorVariable[];
 }) {
-  let host!: HTMLDivElement;
+  let host: HTMLDivElement | undefined;
   let editor: UrlEditorHandle | undefined;
   const [ready, setReady] = createSignal(false);
 
   onSettled(() => {
+    const target = host;
+    if (!target) return;
     let gone = false;
     void import('../../lib/url-editor.ts').then(({ createUrlEditor }) => {
       if (gone) return;
-      editor = createUrlEditor(host, {
+      editor = createUrlEditor(target, {
         value: props.value,
         label: props.label,
         placeholder: props.placeholder ?? '',
@@ -71,7 +73,7 @@ export default function UrlEditor(props: {
           {props.value || props.placeholder}
         </span>
       </Show>
-      <div ref={host} class="min-w-0 flex-1" />
+      <div ref={(element) => (host = element)} class="min-w-0 flex-1" />
     </div>
   );
 }

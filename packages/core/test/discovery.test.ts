@@ -41,7 +41,16 @@ interface CallOptions {
 
 /** A captured request for the model, built the way the panel builds one. */
 function call(method: string, url: string, options: CallOptions = {}) {
-  const { status = 200, request, response, requestHeaders = [], at = Date.UTC(2026, 0, 1) + counter * 100, type = 'fetch', mime = 'application/json', duration = 20 } = options;
+  const {
+    status = 200,
+    request,
+    response,
+    requestHeaders = [],
+    at = Date.UTC(2026, 0, 1) + counter * 100,
+    type = 'fetch',
+    mime = 'application/json',
+    duration = 20,
+  } = options;
   const responseText = response === undefined ? '' : JSON.stringify(response);
   const har = {
     startedDateTime: new Date(at).toISOString(),
@@ -79,6 +88,43 @@ function feed(model: DiscoveryModel, ...calls: ReturnType<typeof call>[]) {
   for (const { captured, body } of calls) model.observe(captured, body);
 }
 
+const short = (key: string) => key.replace('https://api.test', '');
+
+const infer = (...samples: unknown[]): JsonSchema => {
+  const acc = emptySchemaAcc();
+  for (const sample of samples) observeValue(acc, sample);
+  return inferSchema(acc);
+};
+
+function sampleModel() {
+  const model = DiscoveryModel.create('Shop API');
+  feed(
+    model,
+    call('POST', 'https://api.test/auth/login', {
+      request: { user: 'a', password: 'x' },
+      response: { token: 'tok_live_9f8e7d6c5b4a3210', expires: 3600 },
+      requestHeaders: [],
+    }),
+    call('GET', 'https://api.test/v1/products', {
+      response: [
+        { id: 1, name: 'Pen', price: 1.5 },
+        { id: 2, name: 'Ink', price: 2 },
+      ],
+      requestHeaders: [{ name: 'authorization', value: 'Bearer tok_live_9f8e7d6c5b4a3210' }],
+    }),
+    call('GET', 'https://api.test/v1/products/1', {
+      response: { id: 1, name: 'Pen', price: 1.5, tags: ['a'] },
+      requestHeaders: [{ name: 'authorization', value: 'Bearer tok_live_9f8e7d6c5b4a3210' }],
+    }),
+    call('GET', 'https://api.test/v1/products/2', {
+      response: { id: 2, name: 'Ink', price: 2, tags: [] },
+      requestHeaders: [{ name: 'authorization', value: 'Bearer tok_live_9f8e7d6c5b4a3210' }],
+    }),
+    call('GET', 'https://api.test/v1/products/9', { status: 404, response: { error: 'not found' } }),
+  );
+  return model;
+}
+
 describe('path normalisation', () => {
   it('turns ids into named parameters and leaves words alone', () => {
     expect(normalizePath('/api/users/123').template).toBe('/api/users/{userId}');
@@ -92,12 +138,6 @@ describe('path normalisation', () => {
 });
 
 describe('schema inference', () => {
-  const infer = (...samples: unknown[]): JsonSchema => {
-    const acc = emptySchemaAcc();
-    for (const sample of samples) observeValue(acc, sample);
-    return inferSchema(acc);
-  };
-
   it('merges samples: nullable, optional, types, and says it is inferred', () => {
     const schema = infer(
       { id: 123, name: 'Cristian', email: 'test@example.com', active: true },
@@ -122,7 +162,12 @@ describe('schema inference', () => {
 
   it('flags conflicting types, formats, enum candidates and mixed numbers', () => {
     const schema = infer(
-      ...Array.from({ length: 6 }, (_, i) => ({ when: '2026-01-02T03:04:05Z', state: i % 2 ? 'open' : 'closed', mixed: i % 2 ? 1 : 'one', n: i % 2 ? 1 : 1.5 })),
+      ...Array.from({ length: 6 }, (_, i) => ({
+        when: '2026-01-02T03:04:05Z',
+        state: i % 2 ? 'open' : 'closed',
+        mixed: i % 2 ? 1 : 'one',
+        n: i % 2 ? 1 : 1.5,
+      })),
     ) as { properties: Record<string, JsonSchema> };
     expect(schema.properties.when).toMatchObject({ type: 'string', format: 'date-time' });
     expect(schema.properties.state).toMatchObject({ enum: ['closed', 'open'], 'x-enum-candidate': true });
@@ -135,7 +180,9 @@ describe('schema inference', () => {
   });
 
   it('never offers personal fields as enums, and handles arrays and nesting', () => {
-    const schema = infer(...Array.from({ length: 8 }, (_, i) => ({ name: i % 2 ? 'Ana' : 'Luis', items: [{ sku: 'a' }, { sku: 'b', qty: 2 }] }))) as {
+    const schema = infer(
+      ...Array.from({ length: 8 }, (_, i) => ({ name: i % 2 ? 'Ana' : 'Luis', items: [{ sku: 'a' }, { sku: 'b', qty: 2 }] })),
+    ) as {
       properties: Record<string, JsonSchema>;
     };
     expect(schema.properties.name).toEqual({ type: 'string' });
@@ -197,8 +244,12 @@ describe('discovery model', () => {
     );
     expect(model.state.seen).toBe(7);
     expect(model.state.ignored).toBe(2);
-    const keys = Object.keys(model.state.endpoints).sort();
-    expect(keys).toEqual(['GET https://api.test/api/users', 'GET https://api.test/api/users/me', 'GET https://api.test/api/users/{userId}']);
+    const keys = Object.keys(model.state.endpoints).toSorted();
+    expect(keys).toEqual([
+      'GET https://api.test/api/users',
+      'GET https://api.test/api/users/me',
+      'GET https://api.test/api/users/{userId}',
+    ]);
     const users = model.state.endpoints['GET https://api.test/api/users/{userId}']!;
     expect(users.calls).toBe(3);
     expect(users.query.expand).toMatchObject({ count: 1, examples: ['team'] });
@@ -209,10 +260,19 @@ describe('discovery model', () => {
     const model = DiscoveryModel.create('t');
     feed(
       model,
-      call('POST', 'https://api.test/graphql', { request: { operationName: 'GetUser', query: 'query GetUser { user { id } }', variables: { id: 1 } }, response: { data: { user: { id: 1 } } } }),
-      call('POST', 'https://api.test/graphql', { request: { query: 'mutation Save($x: Int) { save(x: $x) }', variables: { x: 2 } }, response: { data: { save: true } } }),
+      call('POST', 'https://api.test/graphql', {
+        request: { operationName: 'GetUser', query: 'query GetUser { user { id } }', variables: { id: 1 } },
+        response: { data: { user: { id: 1 } } },
+      }),
+      call('POST', 'https://api.test/graphql', {
+        request: { query: 'mutation Save($x: Int) { save(x: $x) }', variables: { x: 2 } },
+        response: { data: { save: true } },
+      }),
     );
-    expect(Object.keys(model.state.endpoints).sort()).toEqual(['POST https://api.test/graphql#GetUser', 'POST https://api.test/graphql#Save']);
+    expect(Object.keys(model.state.endpoints).toSorted()).toEqual([
+      'POST https://api.test/graphql#GetUser',
+      'POST https://api.test/graphql#Save',
+    ]);
     expect(model.state.endpoints['POST https://api.test/graphql#GetUser']!.requestSchema).toBeDefined();
   });
 
@@ -220,11 +280,19 @@ describe('discovery model', () => {
     const model = DiscoveryModel.create('t');
     const countries = ['spain', 'france', 'italy', 'germany', 'portugal'];
     feed(model, ...countries.map((name) => call('GET', `https://api.test/countries/${name}`, { response: { name, code: 'xx', pop: 1 } })));
-    feed(model, call('GET', 'https://api.test/other/alpha', { response: { a: 1 } }), call('GET', 'https://api.test/other/beta', { response: { b: 'x' } }));
+    feed(
+      model,
+      call('GET', 'https://api.test/other/alpha', { response: { a: 1 } }),
+      call('GET', 'https://api.test/other/beta', { response: { b: 'x' } }),
+    );
     expect(Object.keys(model.state.endpoints)).toHaveLength(7);
     expect(model.consolidate()).toBe(4);
-    const keys = Object.keys(model.state.endpoints).sort();
-    expect(keys).toEqual(['GET https://api.test/countries/{country}', 'GET https://api.test/other/alpha', 'GET https://api.test/other/beta']);
+    const keys = Object.keys(model.state.endpoints).toSorted();
+    expect(keys).toEqual([
+      'GET https://api.test/countries/{country}',
+      'GET https://api.test/other/alpha',
+      'GET https://api.test/other/beta',
+    ]);
     expect(model.state.endpoints['GET https://api.test/countries/{country}']!.calls).toBe(5);
   });
 
@@ -233,14 +301,22 @@ describe('discovery model', () => {
     const t0 = Date.UTC(2026, 0, 1);
     feed(
       model,
-      call('POST', 'https://api.test/auth/login', { at: t0, request: { user: 'a' }, response: { token: 'tok_live_9f8e7d6c5b4a3210', userId: 98765 } }),
-      call('GET', 'https://api.test/api/profile', { at: t0 + 200, requestHeaders: [{ name: 'authorization', value: 'Bearer tok_live_9f8e7d6c5b4a3210' }], response: { id: 98765 } }),
+      call('POST', 'https://api.test/auth/login', {
+        at: t0,
+        request: { user: 'a' },
+        response: { token: 'tok_live_9f8e7d6c5b4a3210', userId: 98765 },
+      }),
+      call('GET', 'https://api.test/api/profile', {
+        at: t0 + 200,
+        requestHeaders: [{ name: 'authorization', value: 'Bearer tok_live_9f8e7d6c5b4a3210' }],
+        response: { id: 98765 },
+      }),
       call('GET', 'https://api.test/api/users/98765/projects', { at: t0 + 400, response: [] }),
       call('GET', 'https://api.test/late', { at: t0 + 60_000, response: {} }),
     );
-    const short = (key: string) => key.replace('https://api.test', '');
     const edges = Object.values(model.state.edges).map(
-      (edge) => `${edge.kind}: ${short(edge.from)} -> ${short(edge.to)} [${edge.evidence.map((e) => `${e.source} => ${e.target}`).join(', ')}]`,
+      (edge) =>
+        `${edge.kind}: ${short(edge.from)} -> ${short(edge.to)} [${edge.evidence.map((e) => `${e.source} => ${e.target}`).join(', ')}]`,
     );
     expect(edges).toContain('data: POST /auth/login -> GET /api/profile [$.token => header authorization]');
     expect(edges).toContain('data: GET /api/profile -> GET /api/users/{userId}/projects [$.id => path]');
@@ -253,30 +329,27 @@ describe('discovery model', () => {
 });
 
 describe('discovery export', () => {
-  function sampleModel() {
-    const model = DiscoveryModel.create('Shop API');
-    feed(
-      model,
-      call('POST', 'https://api.test/auth/login', { request: { user: 'a', password: 'x' }, response: { token: 'tok_live_9f8e7d6c5b4a3210', expires: 3600 }, requestHeaders: [] }),
-      call('GET', 'https://api.test/v1/products', { response: [{ id: 1, name: 'Pen', price: 1.5 }, { id: 2, name: 'Ink', price: 2 }], requestHeaders: [{ name: 'authorization', value: 'Bearer tok_live_9f8e7d6c5b4a3210' }] }),
-      call('GET', 'https://api.test/v1/products/1', { response: { id: 1, name: 'Pen', price: 1.5, tags: ['a'] }, requestHeaders: [{ name: 'authorization', value: 'Bearer tok_live_9f8e7d6c5b4a3210' }] }),
-      call('GET', 'https://api.test/v1/products/2', { response: { id: 2, name: 'Ink', price: 2, tags: [] }, requestHeaders: [{ name: 'authorization', value: 'Bearer tok_live_9f8e7d6c5b4a3210' }] }),
-      call('GET', 'https://api.test/v1/products/9', { status: 404, response: { error: 'not found' } }),
-    );
-    return model;
-  }
-
   it('generates OpenAPI 3.1 with shared components, params, security and the inferred note', () => {
-    const doc = buildOpenApi(sampleModel()) as { openapi: string; info: Record<string, unknown>; paths: Record<string, Record<string, Record<string, unknown>>>; components: { schemas: Record<string, unknown>; securitySchemes: unknown } };
+    const doc = buildOpenApi(sampleModel()) as {
+      openapi: string;
+      info: Record<string, unknown>;
+      paths: Record<string, Record<string, Record<string, unknown>>>;
+      components: { schemas: Record<string, unknown>; securitySchemes: unknown };
+    };
     expect(doc.openapi).toBe('3.1.0');
     expect(doc.info['x-inferred']).toBe(true);
     const product = doc.paths['/v1/products/{productId}']!.get!;
-    expect(product.parameters).toEqual([expect.objectContaining({ name: 'productId', in: 'path', required: true, schema: { type: 'integer' } })]);
+    expect(product.parameters).toEqual([
+      expect.objectContaining({ name: 'productId', in: 'path', required: true, schema: { type: 'integer' } }),
+    ]);
     expect((product.responses as Record<string, unknown>)['404']).toBeDefined();
     expect(product.security).toEqual([{ bearerAuth: [] }]);
     expect(doc.components.securitySchemes).toEqual({ bearerAuth: { type: 'http', scheme: 'bearer' } });
     expect(Object.keys(doc.components.schemas)).toContain('Product');
-    const list = doc.paths['/v1/products']!.get!.responses as Record<string, { content: Record<string, { schema: { items: { $ref: string } } }> }>;
+    const list = doc.paths['/v1/products']!.get!.responses as Record<
+      string,
+      { content: Record<string, { schema: { items: { $ref: string } } }> }
+    >;
     expect(list['200']!.content['application/json']!.schema.items.$ref).toBe('#/components/schemas/Product');
     // a credential never reaches the document
     expect(JSON.stringify(doc)).not.toMatch(/tok_live|"x"/);
@@ -318,7 +391,11 @@ describe('discovery export', () => {
   it('compares two sessions', () => {
     const base = sampleModel();
     const next = sampleModel();
-    feed(next, call('GET', 'https://api.test/v1/orders', { response: { id: 1 } }), call('GET', 'https://api.test/v1/products/5', { response: { id: 5, name: 'Cap', price: 'free' } }));
+    feed(
+      next,
+      call('GET', 'https://api.test/v1/orders', { response: { id: 1 } }),
+      call('GET', 'https://api.test/v1/products/5', { response: { id: 5, name: 'Cap', price: 'free' } }),
+    );
     const diff = diffSessions(base, next);
     expect(diff.added).toEqual(['GET https://api.test/v1/orders']);
     expect(diff.changed[0]!.schemas[0]!.changes.map((c) => `${c.path} ${c.change}`)).toContain('$.price type');
@@ -326,9 +403,21 @@ describe('discovery export', () => {
 
   it('lays out a dependency graph in layers', () => {
     const layout = layoutGraph(
-      [{ id: 'a', label: 'a' }, { id: 'b', label: 'b' }, { id: 'c', label: 'c' }],
-      [{ from: 'a', to: 'b', kind: 'data', count: 1 }, { from: 'b', to: 'c', kind: 'data', count: 1 }, { from: 'c', to: 'a', kind: 'data', count: 1 }],
+      [
+        { id: 'a', label: 'a' },
+        { id: 'b', label: 'b' },
+        { id: 'c', label: 'c' },
+      ],
+      [
+        { from: 'a', to: 'b', kind: 'data', count: 1 },
+        { from: 'b', to: 'c', kind: 'data', count: 1 },
+        { from: 'c', to: 'a', kind: 'data', count: 1 },
+      ],
     );
-    expect(layout.nodes.map((node) => [node.id, node.layer])).toEqual([['a', 0], ['b', 1], ['c', 2]]); // the edge closing the cycle is ignored for layering
+    expect(layout.nodes.map((node) => [node.id, node.layer])).toEqual([
+      ['a', 0],
+      ['b', 1],
+      ['c', 2],
+    ]); // the edge closing the cycle is ignored for layering
   });
 });

@@ -101,7 +101,8 @@ export function bodyTypeOf(headers: string, body: string): BodyTypeId {
   const contentType = (getHeader(headers, 'content-type') ?? '').toLowerCase();
   const json = parseJson(body);
   if ((contentType.includes('json') || (!contentType && json !== undefined)) && isRecord(json)) {
-    if (typeof json.query === 'string' && Object.keys(json).every((key) => ['query', 'variables', 'operationName'].includes(key))) return 'graphql';
+    if (typeof json.query === 'string' && Object.keys(json).every((key) => ['query', 'variables', 'operationName'].includes(key)))
+      return 'graphql';
   }
   if (contentType.includes('json') || (!contentType && json !== undefined)) return 'json';
   if (contentType.includes('x-www-form-urlencoded')) return 'urlencoded';
@@ -119,8 +120,9 @@ export function bodyTypeOf(headers: string, body: string): BodyTypeId {
 
 /** Encodes text for a form, leaving {{variables}} as they are so they can still be filled in. */
 function encodeForm(text: string): string {
-  return text.replace(/(\{\{\s*[\w.-]+\s*\}\})|([^{]+|\{)/g, (_all, variable: string | undefined, other: string | undefined) =>
-    variable ?? encodeURIComponent(other ?? '').replace(/%20/g, '+'),
+  return text.replace(
+    /(\{\{\s*[\w.-]+\s*\}\})|([^{]+|\{)/g,
+    (_all, variable: string | undefined, other: string | undefined) => variable ?? encodeURIComponent(other ?? '').replace(/%20/g, '+'),
   );
 }
 

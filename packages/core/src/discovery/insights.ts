@@ -29,18 +29,27 @@ export interface Coverage {
 const pct = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : 0);
 
 /** Coverage of the observed traffic, not of the whole API: an endpoint nobody called is not here. */
+const keysOf = (list: EndpointStats[]) => list.map((endpoint) => endpoint.key);
+
 export function coverageOf(model: DiscoveryModel): Coverage {
   const endpoints = model.endpoints();
-  const withSchema = endpoints.filter((endpoint) => Object.values(endpoint.responses).some((acc) => acc.n > 0 && Object.keys(acc.types).some((type) => type !== 'null')));
+  const withSchema = endpoints.filter((endpoint) =>
+    Object.values(endpoint.responses).some((acc) => acc.n > 0 && Object.keys(acc.types).some((type) => type !== 'null')),
+  );
   const frozen = model.state.frozen;
-  const frozenEndpoints = frozen ? Object.keys(frozen.schemas).map((key) => model.state.endpoints[key]).filter((e): e is EndpointStats => Boolean(e)) : [];
+  const frozenEndpoints = frozen
+    ? Object.keys(frozen.schemas)
+        .map((key) => model.state.endpoints[key])
+        .filter((e): e is EndpointStats => Boolean(e))
+    : [];
   const validated = frozenEndpoints.filter((endpoint) => endpoint.validation.checked > 0);
   const inconsistent = endpoints.filter((endpoint) =>
     model.findingsOf(endpoint).some((entry) => entry.findings.some((finding) => finding.kind === 'type-conflict')),
   );
-  const erroring = endpoints.filter((endpoint) => Object.keys(endpoint.statuses).some((status) => status === 'failed' || Number(status) >= 400));
+  const erroring = endpoints.filter((endpoint) =>
+    Object.keys(endpoint.statuses).some((status) => status === 'failed' || Number(status) >= 400),
+  );
   const thin = endpoints.filter((endpoint) => endpoint.calls < THIN_SAMPLES);
-  const keys = (list: EndpointStats[]) => list.map((endpoint) => endpoint.key);
   return {
     endpoints: endpoints.length,
     withSchema: withSchema.length,
@@ -52,11 +61,11 @@ export function coverageOf(model: DiscoveryModel): Coverage {
     thin: thin.length,
     schemaPct: pct(withSchema.length, endpoints.length),
     contractPct: pct(validated.length, frozenEndpoints.length),
-    noSchema: keys(endpoints.filter((endpoint) => !withSchema.includes(endpoint))),
-    erroring: keys(erroring),
-    inconsistentKeys: keys(inconsistent),
-    thinKeys: keys(thin),
-    unexercised: keys(frozenEndpoints.filter((endpoint) => endpoint.validation.checked === 0)),
+    noSchema: keysOf(endpoints.filter((endpoint) => !withSchema.includes(endpoint))),
+    erroring: keysOf(erroring),
+    inconsistentKeys: keysOf(inconsistent),
+    thinKeys: keysOf(thin),
+    unexercised: keysOf(frozenEndpoints.filter((endpoint) => endpoint.validation.checked === 0)),
     newSinceFreeze: model.state.newSinceFreeze.filter((key) => key in model.state.endpoints),
   };
 }
@@ -87,11 +96,14 @@ export function schemaDiff(before: JsonSchema, after: JsonSchema, path = '$', ou
     if (!(key in was)) out.push({ path: `${path}.${key}`, change: 'added', detail: typesOf(now[key]!) });
     else {
       schemaDiff(was[key]!, now[key]!, `${path}.${key}`, out);
-      if (wasRequired.has(key) && !nowRequired.has(key)) out.push({ path: `${path}.${key}`, change: 'optional', detail: 'was always present, now sometimes missing' });
-      if (!wasRequired.has(key) && nowRequired.has(key)) out.push({ path: `${path}.${key}`, change: 'required', detail: 'now always present' });
+      if (wasRequired.has(key) && !nowRequired.has(key))
+        out.push({ path: `${path}.${key}`, change: 'optional', detail: 'was always present, now sometimes missing' });
+      if (!wasRequired.has(key) && nowRequired.has(key))
+        out.push({ path: `${path}.${key}`, change: 'required', detail: 'now always present' });
     }
   }
-  for (const key of Object.keys(was)) if (!(key in now)) out.push({ path: `${path}.${key}`, change: 'removed', detail: typesOf(was[key]!) });
+  for (const key of Object.keys(was))
+    if (!(key in now)) out.push({ path: `${path}.${key}`, change: 'removed', detail: typesOf(was[key]!) });
   if (before.items && after.items) schemaDiff(before.items as JsonSchema, after.items as JsonSchema, `${path}[]`, out);
   return out;
 }
@@ -115,7 +127,13 @@ export function diffSessions(before: DiscoveryModel, after: DiscoveryModel): Ses
       added: Object.keys(now.statuses).filter((status) => !(status in was.statuses)),
       removed: Object.keys(was.statuses).filter((status) => !(status in now.statuses)),
     };
-    const schemas = [...new Set([...Object.keys(was.responses), ...Object.keys(now.responses), ...(was.requestSchema || now.requestSchema ? ['request'] : [])])]
+    const schemas = [
+      ...new Set([
+        ...Object.keys(was.responses),
+        ...Object.keys(now.responses),
+        ...(was.requestSchema || now.requestSchema ? ['request'] : []),
+      ]),
+    ]
       .map((status) => {
         const left = before.schemaOf(was, status);
         const right = after.schemaOf(now, status);
@@ -126,4 +144,3 @@ export function diffSessions(before: DiscoveryModel, after: DiscoveryModel): Ses
   }
   return { added: Object.keys(b).filter((key) => !(key in a)), removed: Object.keys(a).filter((key) => !(key in b)), changed };
 }
-

@@ -70,5 +70,9 @@ export interface UrlVariable {
 
 /** Every {{name}} in the text. */
 export function urlVariables(text: string): UrlVariable[] {
-  return [...text.matchAll(/\{\{\s*([\w.-]+)\s*\}\}/g)].map((match) => ({ from: match.index, to: match.index + match[0].length, name: match[1]! }));
+  return [...text.matchAll(/\{\{\s*([\w.-]+)\s*\}\}/g)].map((match) => ({
+    from: match.index,
+    to: match.index + match[0].length,
+    name: match[1]!,
+  }));
 }

@@ -30,12 +30,22 @@ import SessionsTab from './SessionsTab.tsx';
 
 type DiscoveryTab = 'endpoints' | 'schemas' | 'contracts' | 'dependencies' | 'coverage' | 'scenarios' | 'sessions';
 
-const EXPORT_FORMATS: DiscoveryExportFormat[] = ['package', 'openapi-yaml', 'openapi-json', 'schemas', 'typescript', 'markdown', 'report', 'graph'];
+const EXPORT_FORMATS: DiscoveryExportFormat[] = [
+  'package',
+  'openapi-yaml',
+  'openapi-json',
+  'schemas',
+  'typescript',
+  'markdown',
+  'report',
+  'graph',
+];
+
+const two = (n: number) => String(n).padStart(2, '0');
 
 function formatDuration(ms: number): string {
   const total = Math.floor(ms / 1000);
   const [h, m, s] = [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60];
-  const two = (n: number) => String(n).padStart(2, '0');
   return h ? `${h}:${two(m)}:${two(s)}` : `${two(m)}:${two(s)}`;
 }
 
@@ -47,6 +57,10 @@ function Tile(props: { value: number; label: string }) {
     </div>
   );
 }
+
+const model = () => currentModel();
+const live = () => discoveryStatus() === 'recording' || discoveryStatus() === 'paused';
+const statusLabel = () => t(`discovery.${discoveryStatus()}`);
 
 /**
  * API AutoDiscovery: press Start, use the app, and the endpoints, schemas, contracts and
@@ -60,8 +74,6 @@ export default function DiscoveryView() {
     void loadSavedList();
   });
 
-  const model = () => currentModel();
-  const live = () => discoveryStatus() === 'recording' || discoveryStatus() === 'paused';
   const endpointCount = createMemo(() => model()?.endpoints().length ?? 0);
   const overview = createMemo(() => {
     const current = model();
@@ -77,8 +89,6 @@ export default function DiscoveryView() {
     };
   });
 
-  const statusLabel = () => t(`discovery.${discoveryStatus()}`);
-
   return (
     <div class="flex h-full min-h-0 flex-col">
       <header class="flex flex-col gap-2 border-b border-line p-2">
@@ -91,7 +101,10 @@ export default function DiscoveryView() {
             ]}
             role="status"
           >
-            <span class={['inline-block size-2 rounded-full', discoveryStatus() === 'recording' ? 'animate-pulse bg-bad' : 'bg-fg-2']} aria-hidden="true" />
+            <span
+              class={['inline-block size-2 rounded-full', discoveryStatus() === 'recording' ? 'animate-pulse bg-bad' : 'bg-fg-2']}
+              aria-hidden="true"
+            />
             {statusLabel()}
           </span>
           <Show when={model()}>
@@ -107,10 +120,22 @@ export default function DiscoveryView() {
           <Switch>
             <Match when={discoveryStatus() === 'recording'}>
               <IconButton icon="pause" label={t('discovery.pause')} text={t('discovery.pause')} onClick={pauseRecording} />
-              <IconButton icon="search" variant="primary" label={t('discovery.stopHint')} text={t('discovery.stop')} onClick={stopAndAnalyze} />
+              <IconButton
+                icon="search"
+                variant="primary"
+                label={t('discovery.stopHint')}
+                text={t('discovery.stop')}
+                onClick={stopAndAnalyze}
+              />
             </Match>
             <Match when={discoveryStatus() === 'paused'}>
-              <IconButton icon="record" variant="primary" label={t('discovery.resume')} text={t('discovery.resume')} onClick={resumeRecording} />
+              <IconButton
+                icon="record"
+                variant="primary"
+                label={t('discovery.resume')}
+                text={t('discovery.resume')}
+                onClick={resumeRecording}
+              />
               <IconButton icon="search" label={t('discovery.stopHint')} text={t('discovery.stop')} onClick={stopAndAnalyze} />
             </Match>
             <Match when={true}>
@@ -140,7 +165,13 @@ export default function DiscoveryView() {
             onClick={analyzeCapturedTraffic}
           />
           <Show when={model() && !live()}>
-            <IconButton icon="close" variant="ghost" label={t('discovery.closeSession')} text={t('discovery.closeSession')} onClick={closeSession} />
+            <IconButton
+              icon="close"
+              variant="ghost"
+              label={t('discovery.closeSession')}
+              text={t('discovery.closeSession')}
+              onClick={closeSession}
+            />
           </Show>
 
           <span class="ms-auto flex flex-wrap items-center gap-2">

@@ -29,7 +29,9 @@ export function parseForTree(text: string, plain?: { value: unknown }): { ok: tr
       return { ok: true, value: plain.value as JsonValue };
     }
     const value = JSON.parse(text, (_key, parsed: unknown, context?: { source?: string }) =>
-      typeof parsed === 'number' && context?.source !== undefined && context.source !== String(parsed) ? new ExactNumber(context.source) : parsed,
+      typeof parsed === 'number' && context?.source !== undefined && context.source !== String(parsed)
+        ? new ExactNumber(context.source)
+        : parsed,
     ) as JsonValue;
     return { ok: true, value };
   } catch (error) {
@@ -319,9 +321,7 @@ export function pathText(path: readonly JsonKey[]): string {
   return (
     '$' +
     path
-      .map((key) =>
-        typeof key === 'number' ? `[${key}]` : /^[A-Za-z_$][\w$]*$/.test(key) ? `.${key}` : `[${JSON.stringify(key)}]`,
-      )
+      .map((key) => (typeof key === 'number' ? `[${key}]` : /^[A-Za-z_$][\w$]*$/.test(key) ? `.${key}` : `[${JSON.stringify(key)}]`))
       .join('')
   );
 }

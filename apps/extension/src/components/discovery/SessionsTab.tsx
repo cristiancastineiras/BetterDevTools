@@ -22,10 +22,10 @@ async function remove(id: string, name: string) {
   if (confirmed) await deleteSavedSession(id);
 }
 
+const current = () => currentModel()?.state.id ?? null;
+
 /** Saved sessions (kept in this browser, scrubbed of credentials), and what changed against one. */
 export default function SessionsTab() {
-  const current = () => currentModel()?.state.id ?? null;
-
   return (
     <div class="flex h-full min-h-0 flex-col gap-3 overflow-auto p-3">
       <p class="max-w-2xl text-fg-2">{t('discovery.sessions.hint')}</p>
@@ -42,10 +42,20 @@ export default function SessionsTab() {
                     </Show>
                   </p>
                   <p class="text-fg-2">
-                    {t('discovery.sessions.summary', { endpoints: formatNumber(session.endpoints), requests: formatNumber(session.seen), date: new Date(session.startedAt).toLocaleString() })}
+                    {t('discovery.sessions.summary', {
+                      endpoints: formatNumber(session.endpoints),
+                      requests: formatNumber(session.seen),
+                      date: new Date(session.startedAt).toLocaleString(),
+                    })}
                   </p>
                 </div>
-                <IconButton icon="export" label={t('discovery.sessions.open')} text={t('discovery.sessions.open')} disabled={session.id === current()} onClick={() => void openSavedSession(session.id)} />
+                <IconButton
+                  icon="export"
+                  label={t('discovery.sessions.open')}
+                  text={t('discovery.sessions.open')}
+                  disabled={session.id === current()}
+                  onClick={() => void openSavedSession(session.id)}
+                />
                 <IconButton
                   icon="replay"
                   label={t('discovery.sessions.compareHint')}
@@ -92,7 +102,10 @@ export default function SessionsTab() {
                         <p class={[monoClass, '[overflow-wrap:anywhere]']}>{change.key}</p>
                         <Show when={change.statuses.added.length || change.statuses.removed.length}>
                           <p class="ms-4 text-fg-2">
-                            {t('discovery.sessions.statuses', { added: change.statuses.added.join(', ') || '—', removed: change.statuses.removed.join(', ') || '—' })}
+                            {t('discovery.sessions.statuses', {
+                              added: change.statuses.added.join(', ') || '—',
+                              removed: change.statuses.removed.join(', ') || '—',
+                            })}
                           </p>
                         </Show>
                         <For each={change.schemas}>

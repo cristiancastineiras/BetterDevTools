@@ -27,7 +27,9 @@ export default function SuggestInput(props: {
   const matches = createMemo(() => {
     const typed = props.value.trim().toLowerCase();
     const found = props.suggestions.filter((name) => name.toLowerCase() !== typed && name.toLowerCase().includes(typed));
-    return found.sort((a, b) => Number(b.toLowerCase().startsWith(typed)) - Number(a.toLowerCase().startsWith(typed))).slice(0, MAX_SUGGESTIONS);
+    return found
+      .toSorted((a, b) => Number(b.toLowerCase().startsWith(typed)) - Number(a.toLowerCase().startsWith(typed)))
+      .slice(0, MAX_SUGGESTIONS);
   });
 
   function open() {

@@ -66,9 +66,7 @@ export default function KeyValueSection(props: {
             <For each={props.rows} keyed={false}>
               {(row) => (
                 <div class="group grid min-h-6 grid-cols-[minmax(120px,180px)_minmax(0,1fr)_26px] gap-x-2.5 border-b border-bg-3 @max-[360px]:grid-cols-[minmax(0,1fr)_26px]">
-                  <dt class="py-0.5 font-mono text-code break-all text-fg-2 @max-[360px]:col-span-full @max-[360px]:pb-0">
-                    {row().name}
-                  </dt>
+                  <dt class="py-0.5 font-mono text-code break-all text-fg-2 @max-[360px]:col-span-full @max-[360px]:pb-0">{row().name}</dt>
                   <dd class="py-0.5 font-mono text-code [overflow-wrap:anywhere]">
                     <Show when={row().tag}>
                       <span class="me-1.5 rounded-sm border border-line px-1 font-sans text-small">{row().tag}</span>

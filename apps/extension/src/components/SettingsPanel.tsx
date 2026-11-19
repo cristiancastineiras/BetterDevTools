@@ -4,7 +4,16 @@ import * as v from 'valibot';
 import { applyLocale, t, type LocalePreference } from '../i18n/index.ts';
 import { extensionVersion } from '../lib/devtools.ts';
 import { applyCaptureLimits, bodiesVersion, captureLog, refilter } from '../state/capture.ts';
-import { DEFAULT_PREFERENCES, PreferenceFields, preferences, THEME_NAMES, THEMES, PreferencesSchema, updatePreferences, type Preferences } from '../state/preferences.ts';
+import {
+  DEFAULT_PREFERENCES,
+  PreferenceFields,
+  preferences,
+  THEME_NAMES,
+  THEMES,
+  PreferencesSchema,
+  updatePreferences,
+  type Preferences,
+} from '../state/preferences.ts';
 import { announce, askConfirmation, closeDialog, openDialog } from '../state/ui.ts';
 import IconButton from './ui/IconButton.tsx';
 import Modal from './ui/Modal.tsx';
@@ -78,23 +87,33 @@ const MONO_FONTS = ['Cascadia Code', 'Consolas', 'Fira Code', 'Source Code Pro',
 
 const THEME_IDS = Object.keys(THEMES) as (keyof typeof THEMES)[];
 const UA_PRESETS = [
-  { name: 'Chrome · Windows', value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36' },
+  {
+    name: 'Chrome · Windows',
+    value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+  },
   { name: 'Firefox · Windows', value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:130.0) Gecko/20100101 Firefox/130.0' },
-  { name: 'Chrome · Android', value: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36' },
+  {
+    name: 'Chrome · Android',
+    value: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
+  },
   {
     name: 'Safari · iPhone',
-    value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+    value:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
   },
   { name: 'Googlebot', value: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' },
   { name: 'curl', value: 'curl/8.5.0' },
 ];
 
+/** Changes one preference (saved a moment later). */
+function setPreference<K extends keyof Preferences>(key: K, value: Preferences[K]): void {
+  updatePreferences((draft) => {
+    draft[key] = value;
+  });
+}
+
 /** The user agent sent by replays: the browser's own, a preset, or any text. */
 function UserAgentField() {
-  const set = (userAgent: string) =>
-    updatePreferences((draft) => {
-      draft.userAgent = userAgent;
-    });
   const options = createMemo(() => {
     const current = preferences.userAgent;
     return [
@@ -108,7 +127,13 @@ function UserAgentField() {
   return (
     <div class="flex max-w-lg flex-col gap-1">
       <span class={sectionTitleClass}>{t('settings.userAgent')}</span>
-      <SelectMenu class="w-56" label={t('settings.userAgent')} value={preferences.userAgent} options={options()} onChange={set} />
+      <SelectMenu
+        class="w-56"
+        label={t('settings.userAgent')}
+        value={preferences.userAgent}
+        options={options()}
+        onChange={(value) => setPreference('userAgent', value)}
+      />
       <input
         class={[fieldClass, monoClass, 'w-full']}
         autocomplete="off"
@@ -119,7 +144,7 @@ function UserAgentField() {
         value={preferences.userAgent}
         onInput={(event) => {
           const value = event.currentTarget.value.trim();
-          if (v.is(PreferenceFields.entries.userAgent, value)) set(value);
+          if (v.is(PreferenceFields.entries.userAgent, value)) setPreference('userAgent', value);
         }}
       />
       <p class="text-fg-2">{t('settings.userAgentHint')}</p>
@@ -129,13 +154,9 @@ function UserAgentField() {
 
 const ACCENTS = ['#8b5cf6', '#22a35a', '#e0791a', '#e5486b', '#0e9aa7'];
 
-/** Accent colour: the default blue, a few presets, or any colour from the colour picker. */
-function AccentPicker() {
-  const set = (accent: string) =>
-    updatePreferences((draft) => {
-      draft.accent = accent;
-    });
-  const swatch = (color: string, label: string, background: string) => (
+/** One colour button of the accent picker (`color` is what it stores, empty for the default). */
+function swatch(color: string, label: string, background: string) {
+  return (
     <button
       type="button"
       class="size-6 cursor-pointer rounded-full border border-line aria-pressed:outline-2 aria-pressed:outline-offset-2 aria-pressed:outline-fg"
@@ -143,9 +164,13 @@ function AccentPicker() {
       title={label}
       aria-label={label}
       aria-pressed={preferences.accent.toLowerCase() === color ? 'true' : 'false'}
-      onClick={() => set(color)}
+      onClick={() => setPreference('accent', color)}
     />
   );
+}
+
+/** Accent colour: the default blue, a few presets, or any colour from the colour picker. */
+function AccentPicker() {
   return (
     <div class="flex flex-wrap items-center gap-2.5" role="group" aria-label={t('settings.accent')}>
       {swatch('', t('settings.accentDefault'), 'light-dark(#0969da, #4493f8)')}
@@ -156,7 +181,7 @@ function AccentPicker() {
           class="size-6 cursor-pointer rounded-full border border-line bg-transparent p-0"
           value={preferences.accent || '#0969da'}
           aria-label={t('settings.accentCustom')}
-          onInput={(event) => set(event.currentTarget.value)}
+          onInput={(event) => setPreference('accent', event.currentTarget.value)}
         />
         {t('settings.accentCustom')}
       </label>
@@ -165,7 +190,15 @@ function AccentPicker() {
 }
 
 /** A slider with its current value, for the font size and weight. */
-function RangeField(props: { label: string; min: number; max: number; step: number; value: number; unit: string; onInput: (value: number) => void }) {
+function RangeField(props: {
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  unit: string;
+  onInput: (value: number) => void;
+}) {
   return (
     <label class="flex items-center justify-between gap-2">
       {props.label}
@@ -200,12 +233,12 @@ function FontField(props: {
   const options = createMemo(() => {
     const current = preferences[props.field];
     const names = !current || props.suggestions.includes(current) ? props.suggestions : [current, ...props.suggestions];
-    return [{ value: '', label: t('settings.fontDefault', { name: props.bundled }) }, ...names.map((name) => ({ value: name, label: name }))];
+    return [
+      { value: '', label: t('settings.fontDefault', { name: props.bundled }) },
+      ...names.map((name) => ({ value: name, label: name })),
+    ];
   });
-  const set = (key: 'fontSans' | 'fontMono' | 'fontSansSize' | 'fontMonoSize' | 'fontSansWeight' | 'fontMonoWeight', value: string | number) =>
-    updatePreferences((draft) => {
-      (draft as Record<string, unknown>)[key] = value;
-    });
+
   return (
     <div class="flex flex-col gap-1">
       <div class="flex items-center justify-between gap-2">
@@ -215,7 +248,7 @@ function FontField(props: {
           label={props.label}
           value={preferences[props.field]}
           options={options()}
-          onChange={(value) => set(props.field, value)}
+          onChange={(value) => setPreference(props.field, value)}
         />
       </div>
       <RangeField
@@ -225,7 +258,7 @@ function FontField(props: {
         step={5}
         unit="%"
         value={preferences[props.size]}
-        onInput={(value) => set(props.size, value)}
+        onInput={(value) => setPreference(props.size, value)}
       />
       <RangeField
         label={t('settings.fontWeight')}
@@ -234,7 +267,7 @@ function FontField(props: {
         step={100}
         unit=""
         value={preferences[props.weight]}
-        onInput={(value) => set(props.weight, value)}
+        onInput={(value) => setPreference(props.weight, value)}
       />
     </div>
   );
@@ -342,11 +375,7 @@ export default function SettingsPanel() {
                 </button>
               )}
             </For>
-            <button
-              type="button"
-              class={[buttonClass(), 'sm:mt-auto']}
-              onClick={() => void resetSettings()}
-            >
+            <button type="button" class={[buttonClass(), 'sm:mt-auto']} onClick={() => void resetSettings()}>
               {t('settings.reset')}
             </button>
           </nav>
@@ -383,8 +412,7 @@ export default function SettingsPanel() {
                                 current: systemIsDark() ? t('settings.themeCurrentDark') : t('settings.themeCurrentLight'),
                               })
                             : (THEME_NAMES[id] ?? t(`settings.themes.${id as 'light' | 'dark'}`)),
-                        description:
-                          id === 'system' ? t('settings.themeSystemTitle') : t(`settings.themes.${THEMES[id] ?? 'dark'}`),
+                        description: id === 'system' ? t('settings.themeSystemTitle') : t(`settings.themes.${THEMES[id] ?? 'dark'}`),
                       }))}
                     />
                   </div>
@@ -411,8 +439,22 @@ export default function SettingsPanel() {
                   </div>
                   <div class="flex max-w-lg flex-col gap-4">
                     <span class={sectionTitleClass}>{t('settings.fonts')}</span>
-                    <FontField label={t('settings.fontSans')} field="fontSans" size="fontSansSize" weight="fontSansWeight" suggestions={SANS_FONTS} bundled="Inter" />
-                    <FontField label={t('settings.fontMono')} field="fontMono" size="fontMonoSize" weight="fontMonoWeight" suggestions={MONO_FONTS} bundled="JetBrains Mono" />
+                    <FontField
+                      label={t('settings.fontSans')}
+                      field="fontSans"
+                      size="fontSansSize"
+                      weight="fontSansWeight"
+                      suggestions={SANS_FONTS}
+                      bundled="Inter"
+                    />
+                    <FontField
+                      label={t('settings.fontMono')}
+                      field="fontMono"
+                      size="fontMonoSize"
+                      weight="fontMonoWeight"
+                      suggestions={MONO_FONTS}
+                      bundled="JetBrains Mono"
+                    />
                     <p class="text-fg-2">{t('settings.fontHint')}</p>
                   </div>
                   <div class="flex max-w-lg flex-col gap-1">

@@ -30,6 +30,12 @@ export interface GraphLayout {
 
 export const GRAPH_BOX = { width: 230, height: 28, gapX: 90, gapY: 14, margin: 12 };
 
+/** Average row of a node's callers (or its own row when it has none), to order a layer. */
+function meanRow(id: string, incoming: Map<string, string[]>, row: Map<string, number>): number {
+  const neighbours = incoming.get(id) ?? [];
+  return neighbours.length ? neighbours.reduce((sum, from) => sum + (row.get(from) ?? 0), 0) / neighbours.length : row.get(id)!;
+}
+
 /**
  * Layers by longest path from the sources (cycles are broken by ignoring the edge that closes
  * them), then orders each layer by where its neighbours sit so edges cross less.
@@ -75,11 +81,7 @@ export function layoutGraph(nodes: GraphNode[], edges: GraphEdge[]): GraphLayout
   for (let sweep = 0; sweep < 4; sweep++) {
     layers.forEach((column, index) => {
       if (!column || index === 0) return;
-      const mean = (id: string) => {
-        const neighbours = incoming.get(id) ?? [];
-        return neighbours.length ? neighbours.reduce((sum, from) => sum + (row.get(from) ?? 0), 0) / neighbours.length : row.get(id)!;
-      };
-      column.sort((a, b) => mean(a.id) - mean(b.id));
+      column.sort((a, b) => meanRow(a.id, incoming, row) - meanRow(b.id, incoming, row));
     });
     settle();
   }
@@ -88,7 +90,13 @@ export function layoutGraph(nodes: GraphNode[], edges: GraphEdge[]): GraphLayout
   const placed = new Map<string, Placed>();
   layers.forEach((column, index) =>
     column?.forEach((node, position) =>
-      placed.set(node.id, { id: node.id, label: node.label, layer: index, x: margin + index * (width + gapX), y: margin + position * (height + gapY) }),
+      placed.set(node.id, {
+        id: node.id,
+        label: node.label,
+        layer: index,
+        x: margin + index * (width + gapX),
+        y: margin + position * (height + gapY),
+      }),
     ),
   );
   const tallest = Math.max(0, ...layers.map((column) => column?.length ?? 0));

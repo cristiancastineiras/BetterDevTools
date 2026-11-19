@@ -8,14 +8,16 @@ import MethodBadge, { StatusBadge } from '../ui/MethodBadge.tsx';
 import SegmentedControl from '../ui/SegmentedControl.tsx';
 import { fieldClass, monoClass, sectionTitleClass } from '../ui/styles.ts';
 
+const model = () => currentModel()!;
+
 type BodyView = 'schema' | 'types' | 'example';
 
 /** The endpoint's key facts, then each part of it: parameters, request, every response. */
 function EndpointDetail(props: { endpoint: EndpointStats }) {
-  const model = () => currentModel()!;
-  const statuses = createMemo(() => Object.keys(props.endpoint.statuses).sort());
+  const statuses = createMemo(() => Object.keys(props.endpoint.statuses).toSorted());
   const [status, setStatus] = createSignal<string>('');
-  const shownStatus = () => (status() && statuses().includes(status()) ? status() : (statuses().find((s) => s in props.endpoint.responses) ?? statuses()[0] ?? ''));
+  const shownStatus = () =>
+    status() && statuses().includes(status()) ? status() : (statuses().find((s) => s in props.endpoint.responses) ?? statuses()[0] ?? '');
   const [view, setView] = createSignal<BodyView>('schema');
 
   const responseKey = () => {
@@ -38,11 +40,16 @@ function EndpointDetail(props: { endpoint: EndpointStats }) {
     <div class="flex flex-col gap-3 p-2">
       <header class="flex flex-wrap items-center gap-2">
         <MethodBadge method={props.endpoint.method} />
-        <span class={[monoClass, 'min-w-0 font-medium [overflow-wrap:anywhere]']}>{props.endpoint.operation ?? props.endpoint.template}</span>
+        <span class={[monoClass, 'min-w-0 font-medium [overflow-wrap:anywhere]']}>
+          {props.endpoint.operation ?? props.endpoint.template}
+        </span>
       </header>
       <p class="text-fg-2">
         {props.endpoint.origin} · {t('discovery.endpoint.calls', { count: formatNumber(props.endpoint.calls) })} ·{' '}
-        {t('discovery.endpoint.timing', { avg: formatNumber(average()), p95: formatNumber(Math.round(percentile95(props.endpoint.timing))) })}
+        {t('discovery.endpoint.timing', {
+          avg: formatNumber(average()),
+          p95: formatNumber(Math.round(percentile95(props.endpoint.timing))),
+        })}
         <Show when={props.endpoint.size.max}> · {t('discovery.endpoint.size', { size: formatBytes(props.endpoint.size.max) })}</Show>
       </p>
 
@@ -66,7 +73,8 @@ function EndpointDetail(props: { endpoint: EndpointStats }) {
             <For each={props.endpoint.params}>
               {(param) => (
                 <li>
-                  <span class="text-syn-prop">{param.name}</span> <span class="text-fg-2">{param.kind}</span> <span class="text-syn-str">{param.example}</span>
+                  <span class="text-syn-prop">{param.name}</span> <span class="text-fg-2">{param.kind}</span>{' '}
+                  <span class="text-syn-str">{param.example}</span>
                 </li>
               )}
             </For>
@@ -82,8 +90,14 @@ function EndpointDetail(props: { endpoint: EndpointStats }) {
               {([name, param]) => (
                 <li>
                   <span class="text-syn-prop">{name}</span> <span class="text-fg-2">{Object.keys(param.types).join(' | ')}</span>
-                  <Show when={param.count < props.endpoint.calls}> <span class="text-warn">{t('discovery.endpoint.optional')}</span></Show>
-                  <Show when={param.examples[0]}> <span class="text-syn-str">{param.examples[0]}</span></Show>
+                  <Show when={param.count < props.endpoint.calls}>
+                    {' '}
+                    <span class="text-warn">{t('discovery.endpoint.optional')}</span>
+                  </Show>
+                  <Show when={param.examples[0]}>
+                    {' '}
+                    <span class="text-syn-str">{param.examples[0]}</span>
+                  </Show>
                 </li>
               )}
             </For>
@@ -123,7 +137,10 @@ function EndpointDetail(props: { endpoint: EndpointStats }) {
             {(code) => (
               <button
                 type="button"
-                class={['cursor-pointer rounded-md border p-0.5', shownStatus() === code ? 'border-accent bg-sel' : 'border-transparent hover:bg-bg-3']}
+                class={[
+                  'cursor-pointer rounded-md border p-0.5',
+                  shownStatus() === code ? 'border-accent bg-sel' : 'border-transparent hover:bg-bg-3',
+                ]}
                 aria-pressed={shownStatus() === code ? 'true' : 'false'}
                 aria-label={t('discovery.endpoint.statusCount', { status: code, count: props.endpoint.statuses[code] ?? 0 })}
                 onClick={() => setStatus(code)}
@@ -192,20 +209,24 @@ function EndpointDetail(props: { endpoint: EndpointStats }) {
   );
 }
 
-const badgeFor = (kind: string) => (kind === 'type-conflict' ? 'bg-bad/15 text-bad' : kind === 'nullable' ? 'bg-warn/15 text-warn' : 'bg-bg-3 text-fg-2');
+const badgeFor = (kind: string) =>
+  kind === 'type-conflict' ? 'bg-bad/15 text-bad' : kind === 'nullable' ? 'bg-warn/15 text-warn' : 'bg-bg-3 text-fg-2';
 
 /** All discovered endpoints, with a filter, and the selected one's details beside it. */
 export default function EndpointsTab() {
-  const model = () => currentModel();
   const [query, setQuery] = createSignal('');
   const [selectedKey, setSelectedKey] = createSignal<string | null>(null);
   const [sortBy, setSortBy] = createSignal<'path' | 'calls'>('path');
 
   const rows = createMemo(() => {
-    const list = model()?.endpoints() ?? [];
+    const list = currentModel()?.endpoints() ?? [];
     const needle = query().trim().toLowerCase();
-    const filtered = needle ? list.filter((endpoint) => endpointLabel(endpoint).toLowerCase().includes(needle) || endpoint.origin.toLowerCase().includes(needle)) : list;
-    return filtered.toSorted((a, b) => (sortBy() === 'calls' ? b.calls - a.calls : a.template.localeCompare(b.template) || a.method.localeCompare(b.method)));
+    const filtered = needle
+      ? list.filter((endpoint) => endpointLabel(endpoint).toLowerCase().includes(needle) || endpoint.origin.toLowerCase().includes(needle))
+      : list;
+    return filtered.toSorted((a, b) =>
+      sortBy() === 'calls' ? b.calls - a.calls : a.template.localeCompare(b.template) || a.method.localeCompare(b.method),
+    );
   });
   const selected = createMemo(() => {
     const found = rows().find((endpoint) => endpoint.key === selectedKey());
@@ -243,19 +264,28 @@ export default function EndpointsTab() {
                   role="option"
                   tabindex="0"
                   aria-selected={endpoint().key === selected()?.key ? 'true' : 'false'}
-                  class={['flex cursor-pointer items-center gap-2 border-b border-bg-3 px-2 py-1 hover:bg-bg-3', { 'bg-sel': endpoint().key === selected()?.key }]}
+                  class={[
+                    'flex cursor-pointer items-center gap-2 border-b border-bg-3 px-2 py-1 hover:bg-bg-3',
+                    { 'bg-sel': endpoint().key === selected()?.key },
+                  ]}
                   onClick={() => setSelectedKey(endpoint().key)}
-                  onKeyDown={(event) => (event.key === 'Enter' || event.key === ' ') && (event.preventDefault(), setSelectedKey(endpoint().key))}
+                  onKeyDown={(event) =>
+                    (event.key === 'Enter' || event.key === ' ') && (event.preventDefault(), setSelectedKey(endpoint().key))
+                  }
                 >
                   <MethodBadge method={endpoint().method} />
                   <span class={[monoClass, 'min-w-0 flex-1 truncate']} title={`${endpoint().origin}${endpoint().template}`}>
                     {endpoint().operation ?? endpoint().template}
                   </span>
                   <span class="flex shrink-0 items-center gap-1">
-                    <For each={Object.keys(endpoint().statuses).sort().slice(0, 3)}>
-                      {(code) => <StatusBadge status={code === 'failed' ? 0 : Number(code)} error={code === 'failed' ? 'failed' : undefined} />}
+                    <For each={Object.keys(endpoint().statuses).toSorted().slice(0, 3)}>
+                      {(code) => (
+                        <StatusBadge status={code === 'failed' ? 0 : Number(code)} error={code === 'failed' ? 'failed' : undefined} />
+                      )}
                     </For>
-                    <span class="w-16 text-end text-fg-2 tabular-nums">{t('discovery.endpoint.calls', { count: formatNumber(endpoint().calls) })}</span>
+                    <span class="w-16 text-end text-fg-2 tabular-nums">
+                      {t('discovery.endpoint.calls', { count: formatNumber(endpoint().calls) })}
+                    </span>
                     <Show when={endpoint().validation.failed > 0}>
                       <span class="text-bad" title={t('discovery.endpoint.violations')}>
                         <Icon name="warning" />

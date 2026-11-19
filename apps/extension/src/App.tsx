@@ -89,6 +89,9 @@ function onFileChosen(event: Event & { currentTarget: HTMLInputElement }) {
   event.currentTarget.value = ''; // choosing the same file again still triggers a change
 }
 
+// generic families (system-ui, monospace…) are keywords and must not be quoted
+const family = (name: string) => (/^(ui-)?(sans-serif|serif|monospace)$|^system-ui$/.test(name) ? name : `"${name}"`);
+
 /** The panel: view tabs, the current view, the footer, and the dialogs shared by all views. */
 export default function App() {
   let filterInput: HTMLInputElement | undefined;
@@ -200,9 +203,10 @@ export default function App() {
       style.setProperty('--mono-size', String(monoSize / 100));
       style.setProperty('--sans-weight', String(sansWeight));
       style.setProperty('--mono-weight', String(monoWeight));
-      // generic families (system-ui, monospace…) are keywords and must not be quoted
-      const family = (name: string) => (/^(ui-)?(sans-serif|serif|monospace)$|^system-ui$/.test(name) ? name : `"${name}"`);
-      for (const [property, name] of [['--font-sans-custom', sans], ['--font-mono-custom', mono]] as const) {
+      for (const [property, name] of [
+        ['--font-sans-custom', sans],
+        ['--font-mono-custom', mono],
+      ] as const) {
         if (name) style.setProperty(property, family(name));
         else style.removeProperty(property);
       }
