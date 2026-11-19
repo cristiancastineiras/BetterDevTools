@@ -1,0 +1,96 @@
+name: Publish to stores
+
+# Optional and manual. A GitHub Release does not publish to any store by itself: run this workflow, with an
+# existing release tag, to send that release's packages to the Chrome Web Store, Edge Add-ons and Firefox
+# Add-ons. It reuses the zips attached to the release (the exact files that were built from the tag).
+# Needs the "store-publish" environment (add required reviewers to it) and the secrets listed in docs/releasing.md.
+# "dry run" checks the credentials without uploading or submitting anything, and is on by default.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (for example v0.1.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Only check the credentials; upload and submit nothing'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-stores-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Submit ${{ inputs.tag }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: store-publish
+    steps:
+      - name: Check the tag
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Not a stable release tag: $TAG" >&2
+            exit 1
+          fi
+
+      - name: Checkout the tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download the release packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: gh release download "$TAG" --dir dist --pattern '*.zip'
+
+      - name: Submit to the stores
+        working-directory: apps/extension
+        env:
+          TAG: ${{ inputs.tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+          CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
+          CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
+          EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+          EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+          FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
+          FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+          FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAGS=()
+          if [[ "$DRY_RUN" == "true" ]]; then FLAGS+=(--dry-run); fi
+          pnpm exec wxt submit "${FLAGS[@]}" \
+            --chrome-api-version v2 \
+            --chrome-zip "../../dist/betterdevtools-${TAG}-chrome.zip" \
+            --edge-zip "../../dist/betterdevtools-${TAG}-edge.zip" \
+            --firefox-zip "../../dist/betterdevtools-${TAG}-firefox.zip" \
+            --firefox-sources-zip "../../dist/betterdevtools-${TAG}-firefox-sources.zip"
