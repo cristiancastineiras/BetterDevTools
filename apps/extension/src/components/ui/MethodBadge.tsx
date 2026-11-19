@@ -3,7 +3,7 @@ import { t } from '../../i18n/index.ts';
 
 /** Shared look of method and status badges: the colour pair comes from the HTTP tokens in app.css. */
 export const BADGE_CLASS =
-  'inline-block min-w-[2.6em] rounded-[3px] px-1 text-center font-mono text-[11px]/4 font-semibold whitespace-nowrap';
+  'inline-block min-w-[2.6em] rounded-[3px] px-1 text-center font-mono text-small/4 font-semibold whitespace-nowrap';
 
 export const badgeColors = (token: string) => ({ color: `var(--color-${token})`, background: `var(--color-${token}-bg)` });
 

@@ -1,15 +1,31 @@
 import { tokenize, tokenLines, type Lang, type Token, type TokenKind } from '@betterdevtools/core';
 import { createEffect, createMemo, For, Show } from 'solid-js';
-import { groupByLine, splitAtMatches, type TextMatch } from '../../lib/search.ts';
+import {
+  indexLines,
+  lineCount,
+  lineEnd,
+  lineOfOffset,
+  lineText,
+  matchesBetween,
+  splitAtMatches,
+  type TextLines,
+  type TextSearch,
+} from '../../lib/search.ts';
 import { createVirtualList } from '../../lib/virtual.ts';
 
 const ROW_HEIGHT = 18;
-/** Bodies above this size are shown without colours: tokenizing them would stall the panel. */
-const HIGHLIGHT_MAX_CHARS = 300_000;
+/**
+ * JS, CSS and markup up to this size are coloured as a whole, so comments and strings that span
+ * lines are exact. Bigger ones, and JSON always, are coloured line by line as rows scroll into
+ * view: JSON tokens never span lines, so that is exact for JSON at any size.
+ */
+const WHOLE_TEXT_MAX_CHARS = 500_000;
+/** A single line longer than this (a huge string value) is shown without colours. */
+const LINE_COLOUR_MAX_CHARS = 100_000;
 /** Lines longer than this (minified code) wrap instead of making the view kilometres wide. */
 const WRAP_LINE_CHARS = 2_000;
 
-const TOKEN_CLASS: Record<TokenKind, string> = {
+export const TOKEN_CLASS: Record<TokenKind, string> = {
   kw: 'text-syn-kw',
   str: 'text-syn-str',
   num: 'text-syn-num',
@@ -22,28 +38,20 @@ const TOKEN_CLASS: Record<TokenKind, string> = {
   text: '',
 };
 
-function longestLineLength(text: string): number {
-  let longest = 0;
-  for (let start = 0; start <= text.length;) {
-    const end = text.indexOf('\n', start);
-    const lineEnd = end < 0 ? text.length : end;
-    longest = Math.max(longest, lineEnd - start);
-    start = lineEnd + 1;
-  }
-  return longest;
-}
-
 /**
- * Line-numbered, syntax-coloured text. Only the rows in view are rendered (virtualized), so a
- * 100 000-line response scrolls as smoothly as a short one. Search matches are drawn as <mark>.
+ * Line-numbered, syntax-coloured text. Only the rows in view are rendered (virtualized) and only
+ * those rows are sliced and coloured, so a 3-million-line response scrolls like a short one.
+ * Search matches are drawn as <mark>.
  */
 export default function CodeLines(props: {
-  text: string;
+  /** The text, or its line index when the caller already built it (shared with the search). */
+  text?: string | undefined;
+  lines?: TextLines | undefined;
   lang: Lang;
   /** Accessible name of the scrolling region. */
   label: string;
-  matches?: readonly TextMatch[] | undefined;
-  /** Index in `matches` of the match to emphasize and scroll to. */
+  search?: TextSearch | undefined;
+  /** Index in the search of the match to emphasize and scroll to. */
   currentMatch?: number | undefined;
   /** 0-based line to highlight and scroll to (e.g. a source map position). */
   highlightLine?: number | undefined;
@@ -54,18 +62,27 @@ export default function CodeLines(props: {
 }) {
   let scroller: HTMLDivElement | undefined;
 
-  const lines = createMemo<Token[][]>(() => {
-    const text = props.text;
-    if (props.lang !== 'plain' && text.length <= HIGHLIGHT_MAX_CHARS) return tokenLines(tokenize(text, props.lang));
-    return text.split('\n').map((line): Token[] => (line ? [['text', line]] : []));
+  const source = createMemo(() => props.lines ?? indexLines(props.text ?? ''));
+  const wholeTokens = createMemo<Token[][] | null>(() => {
+    const text = source().text;
+    const lang = props.lang;
+    return lang !== 'plain' && lang !== 'json' && text.length <= WHOLE_TEXT_MAX_CHARS ? tokenLines(tokenize(text, lang)) : null;
   });
-  const longestLine = createMemo(() => longestLineLength(props.text));
-  const wraps = createMemo(() => longestLine() > WRAP_LINE_CHARS);
-  const gutterChars = createMemo(() => String(lines().length).length + 1);
-  const matchesByLine = createMemo(() => groupByLine(props.matches ?? []));
+  function rowTokens(line: number): Token[] {
+    const whole = wholeTokens();
+    if (whole) return whole[line] ?? [];
+    const text = lineText(source(), line);
+    if (!text) return [];
+    return props.lang === 'plain' || text.length > LINE_COLOUR_MAX_CHARS ? [['text', text]] : tokenize(text, props.lang);
+  }
+  const rowMatches = (line: number) =>
+    props.search ? matchesBetween(props.search, source().starts[line]!, lineEnd(source(), line)) : undefined;
+
+  const wraps = createMemo(() => source().longest > WRAP_LINE_CHARS);
+  const gutterChars = createMemo(() => String(lineCount(source())).length + 1);
 
   const virtual = createVirtualList({
-    count: () => lines().length,
+    count: () => lineCount(source()),
     scrollElement: () => scroller,
     estimateSize: ROW_HEIGHT,
     measured: true, // wrapped rows are taller than one line
@@ -74,10 +91,13 @@ export default function CodeLines(props: {
 
   // bring the current match into view: first its row, then the mark itself (long lines scroll sideways)
   createEffect(
-    () => props.matches?.[props.currentMatch ?? -1],
-    (match) => {
-      if (!match) return;
-      virtual.scrollToIndex(match.line, 'center');
+    () => {
+      const offset = props.search?.offsets[props.currentMatch ?? -1];
+      return offset === undefined ? -1 : lineOfOffset(source(), offset);
+    },
+    (line) => {
+      if (line < 0) return;
+      virtual.scrollToIndex(line, 'center');
       requestAnimationFrame(() => scroller?.querySelector('mark[data-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
     },
   );
@@ -109,8 +129,8 @@ export default function CodeLines(props: {
     <div
       ref={(element) => (scroller = element)}
       class={[
-        'relative overflow-auto rounded-sm border border-line bg-bg font-mono text-[11.5px]/[18px] [tab-size:2]',
-        props.fill ? 'min-h-24 flex-1' : 'max-h-[60vh]',
+        'relative overflow-auto rounded-sm border border-line bg-bg font-mono text-code [tab-size:2]',
+        props.fill ? 'min-h-24 flex-1' : 'max-h-[calc(var(--vh)*0.6)]',
       ]}
       role="region"
       aria-label={props.label}
@@ -122,7 +142,7 @@ export default function CodeLines(props: {
         class="relative"
         style={{
           height: `${virtual.totalSize()}px`,
-          width: wraps() ? '100%' : `max(100%, calc(${longestLine() + gutterChars()}ch + 1.5rem))`,
+          width: wraps() ? '100%' : `max(100%, calc(${source().longest + gutterChars()}ch + 1.5rem))`,
         }}
       >
         <For each={virtual.items()}>
@@ -142,7 +162,7 @@ export default function CodeLines(props: {
                 {item.index + 1}
               </span>
               <span data-code class={['ps-2', wraps() ? 'min-w-0 flex-1 break-all whitespace-pre-wrap' : 'whitespace-pre']}>
-                <For each={splitAtMatches(lines()[item.index] ?? [], matchesByLine().get(item.index))}>
+                <For each={splitAtMatches(rowTokens(item.index), rowMatches(item.index))}>
                   {(piece) => (
                     <Show
                       when={piece.match >= 0}

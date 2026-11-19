@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { COPY_FEEDBACK_MS, createCopier, type CopyState } from '../src/lib/copy.ts';
 import { listboxKey, type ListOption } from '../src/lib/listbox.ts';
-import { findMatches, groupByLine, MAX_MATCHES, splitAtMatches, splitByQuery } from '../src/lib/search.ts';
+import {
+  indexLines,
+  lineOfOffset,
+  lineText,
+  matchesBetween,
+  MAX_STORED_MATCHES,
+  searchText,
+  splitAtMatches,
+  splitByQuery,
+} from '../src/lib/search.ts';
 
 const opts = (...labels: (string | [string, true])[]): ListOption[] =>
   labels.map((l) => (typeof l === 'string' ? { value: l, label: l } : { value: l[0], label: l[0], disabled: l[1] }));
@@ -77,23 +86,43 @@ describe('CopyButton state', () => {
 });
 
 describe('find in body', () => {
-  it('finds every occurrence per line, ignoring case unless asked', () => {
-    expect(findMatches(['Ada and ada', 'none', 'ADA'], 'ada', false)).toEqual([
-      { line: 0, start: 0, end: 3 },
-      { line: 0, start: 8, end: 11 },
-      { line: 2, start: 0, end: 3 },
-    ]);
-    expect(findMatches(['Ada and ada'], 'ada', true)).toEqual([{ line: 0, start: 8, end: 11 }]);
-    expect(findMatches(['aaaa'], 'aa', true)).toHaveLength(2); // non-overlapping
-    expect(findMatches(['x'], '', false)).toEqual([]);
+  it('indexes lines without splitting the text', () => {
+    const lines = indexLines('ab\n\ncdef');
+    expect([...lines.starts]).toEqual([0, 3, 4]);
+    expect(lines.longest).toBe(4);
+    expect([0, 1, 2].map((line) => lineText(lines, line))).toEqual(['ab', '', 'cdef']);
+    expect([0, 2, 3, 4, 7].map((offset) => lineOfOffset(lines, offset))).toEqual([0, 0, 1, 2, 2]);
   });
 
-  it('stops at the match limit', () => {
-    expect(findMatches(['a'.repeat(MAX_MATCHES + 50)], 'a', true)).toHaveLength(MAX_MATCHES);
+  it('finds every occurrence, ignoring case unless asked', () => {
+    const text = 'Ada and ada\nnone\nADA';
+    const search = searchText(text, 'ada', false);
+    expect([...search.offsets]).toEqual([0, 8, 17]);
+    expect(search.total).toBe(3);
+    expect([...searchText(text, 'ada', true).offsets]).toEqual([8]);
+    expect(searchText('aaaa', 'aa', true).total).toBe(2); // non-overlapping
+    expect(searchText('x', '', false).total).toBe(0);
+    // lower-casing "İ" adds a character: the RegExp path keeps offsets right
+    expect([...searchText('İx ix', 'ix', false).offsets]).toEqual([3]);
+  });
+
+  it('counts every match but keeps at most the limit', () => {
+    const search = searchText('a'.repeat(MAX_STORED_MATCHES + 50), 'a', true);
+    expect(search.total).toBe(MAX_STORED_MATCHES + 50);
+    expect(search.offsets).toHaveLength(MAX_STORED_MATCHES);
+  });
+
+  it('gives the matches of one line relative to its start', () => {
+    const lines = indexLines('xx ab\nab ab');
+    const search = searchText(lines.text, 'ab', true);
+    expect(matchesBetween(search, lines.starts[1]!, lines.text.length)).toEqual([
+      { start: 0, end: 2, index: 1 },
+      { start: 3, end: 5, index: 2 },
+    ]);
   });
 
   it('cuts tokens at match edges and keeps each token colour', () => {
-    const ranges = groupByLine(findMatches(['"name": "Ada"'], 'e": "A', false)).get(0);
+    const ranges = matchesBetween(searchText('"name": "Ada"', 'e": "A', false), 0, 13);
     const pieces = splitAtMatches(
       [
         ['prop', '"name"'],

@@ -56,13 +56,30 @@ let clearGeneration = 0;
 /** While the backfill is pending, keys of live entries, so the backfill can skip them. */
 let liveKeysDuringBackfill: Set<string> | null = null;
 
+/** Listeners told about each batch of requests added to the log (API discovery watches them). */
+const addedListeners = new Set<(added: Captured[]) => void>();
+const navigatedListeners = new Set<(url: string) => void>();
+
+/** Calls `listener` with every batch of newly captured requests; returns the unsubscribe function. */
+export function onRequestsAdded(listener: (added: Captured[]) => void): () => void {
+  addedListeners.add(listener);
+  return () => void addedListeners.delete(listener);
+}
+
+/** Calls `listener` when the inspected page navigates. */
+export function onPageNavigated(listener: (url: string) => void): () => void {
+  navigatedListeners.add(listener);
+  return () => void navigatedListeners.delete(listener);
+}
+
 function enqueue(entry: { har: HarEntry; body: Body; source: Source }): void {
   pendingEntries.push(entry);
   flushTimer ??= setTimeout(() => {
     flushTimer = undefined;
-    captureLog.add(pendingEntries);
+    const added = captureLog.add(pendingEntries);
     pendingEntries = [];
     publishLogState();
+    for (const listener of addedListeners) listener(added);
   }, FLUSH_DELAY_MS);
 }
 
@@ -96,7 +113,8 @@ export function startDevtoolsCapture(): void {
   if (!attachedToDevtools) return;
   startCapture({
     onRequest: (raw) => capture(raw, 'live'),
-    onNavigated: () => {
+    onNavigated: (url) => {
+      for (const listener of navigatedListeners) listener(url);
       if (!snapshot(preferences).preserveLog) clearRequests();
     },
   });

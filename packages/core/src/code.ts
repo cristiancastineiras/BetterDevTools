@@ -304,11 +304,15 @@ export function formatCode(text: string, lang: 'js' | 'css'): string {
   return out.join('\n');
 }
 
+/** Shape of an already parsed JSON value: an array or object and how many entries it has. */
+export function jsonShape(value: unknown): { kind: 'object' | 'array'; count: number } | null {
+  if (Array.isArray(value)) return { kind: 'array', count: value.length };
+  return typeof value === 'object' && value !== null ? { kind: 'object', count: Object.keys(value).length } : null;
+}
+
 export function jsonSummary(text: string): { kind: 'object' | 'array'; count: number } | null {
   try {
-    const v: unknown = JSON.parse(text);
-    if (Array.isArray(v)) return { kind: 'array', count: v.length };
-    return typeof v === 'object' && v !== null ? { kind: 'object', count: Object.keys(v).length } : null;
+    return jsonShape(JSON.parse(text));
   } catch {
     return null; // not JSON: no summary
   }

@@ -2,7 +2,7 @@
 // field and badge in the panel looks and behaves the same. Variants never repeat a property
 // the base sets, so class order can never decide which colour wins.
 
-export type ButtonVariant = 'default' | 'primary' | 'ghost';
+export type ButtonVariant = 'default' | 'primary' | 'ghost' | 'record';
 
 const BUTTON_BASE = [
   'inline-flex min-h-6.5 min-w-6.5 cursor-pointer items-center justify-center gap-1 rounded-md border py-0.5',
@@ -14,6 +14,8 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   default: 'border-line bg-bg-2 text-fg hover:bg-bg-3 active:bg-line aria-pressed:border-accent aria-pressed:bg-sel',
   primary: 'border-accent bg-accent text-on-accent hover:brightness-110 active:brightness-95',
   ghost: 'border-transparent bg-transparent text-fg hover:bg-bg-3 active:bg-line aria-pressed:bg-sel',
+  // the recording toggle: red dot and red button while it is pressed (recording)
+  record: 'border-line bg-bg-2 text-fg hover:bg-bg-3 active:bg-line aria-pressed:border-bad aria-pressed:bg-bad/10 aria-pressed:text-bad aria-pressed:[&_svg]:fill-current',
 };
 
 /** Classes for a native <button>. `iconOnly` makes it square (no side padding). */

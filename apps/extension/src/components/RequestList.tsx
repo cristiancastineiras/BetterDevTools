@@ -1,6 +1,7 @@
 import { formatBytes, methodToken, statusToken, type Captured } from '@betterdevtools/core';
-import { createMemo, For, Match, Show, Switch } from 'solid-js';
+import { createEffect, createMemo, For, Match, Show, Switch } from 'solid-js';
 import { t } from '../i18n/index.ts';
+import { uiZoom } from '../lib/place.ts';
 import { createVirtualList } from '../lib/virtual.ts';
 import {
   activeRequestId,
@@ -14,6 +15,7 @@ import {
   visibleRequests,
 } from '../state/capture.ts';
 import { preferences, updatePreferences } from '../state/preferences.ts';
+import { openContextMenu } from '../state/ui.ts';
 import { BADGE_CLASS, badgeColors } from './ui/MethodBadge.tsx';
 import { monoClass } from './ui/styles.ts';
 
@@ -33,6 +35,27 @@ const COLUMNS: { key: ColumnKey; text: (request: Captured) => string }[] = [
   { key: 'time', text: (request) => `${Math.round(request.duration)} ms` },
 ];
 
+/** Columns the user can hide; the path column carries the URL and stays. */
+type HideableKey = Exclude<ColumnKey, 'path'>;
+
+function toggleColumn(key: HideableKey) {
+  updatePreferences((draft) => {
+    draft.hiddenColumns = draft.hiddenColumns.includes(key) ? draft.hiddenColumns.filter((hidden) => hidden !== key) : [...draft.hiddenColumns, key];
+  });
+}
+
+/** Menu to show or hide columns (from the toolbar button or a right click on the header). */
+export function openColumnsMenu(at: { clientX: number; clientY: number }): void {
+  openContextMenu(
+    at,
+    t('network.columnsMenu'),
+    COLUMNS.filter((column): column is (typeof COLUMNS)[number] & { key: HideableKey } => column.key !== 'path').map((column) => ({
+      label: `${preferences.hiddenColumns.includes(column.key) ? '\u2003\u2002' : '✓\u2002'}${t(`network.columns.${column.key}`)}`,
+      run: () => toggleColumn(column.key),
+    })),
+  );
+}
+
 const rowId = (requestId: number) => `request-row-${requestId}`;
 
 function setColumnWidth(column: number, width: number) {
@@ -47,7 +70,8 @@ function startColumnResize(event: PointerEvent, column: number) {
   handle.setPointerCapture(event.pointerId);
   const startX = event.clientX;
   const startWidth = preferences.columnWidths[column] ?? 80;
-  const onMove = (move: PointerEvent) => setColumnWidth(column, startWidth + move.clientX - startX);
+  const zoom = uiZoom(); // pointer movement is in window pixels, widths in zoomed ones
+  const onMove = (move: PointerEvent) => setColumnWidth(column, startWidth + (move.clientX - startX) / zoom);
   handle.addEventListener('pointermove', onMove);
   handle.addEventListener('lostpointercapture', () => handle.removeEventListener('pointermove', onMove), { once: true });
 }
@@ -76,13 +100,30 @@ export default function RequestList(props: { onRowMenu: (at: { clientX: number; 
     overscan: 12,
   });
 
+  // New requests keep the list scrolled to the end, until the user scrolls away from it;
+  // scrolling back to the end follows again. Only the user's scrolling changes this flag.
+  let followEnd = true;
+  const nearEnd = () => grid !== undefined && grid.scrollHeight - grid.scrollTop - grid.clientHeight < 8;
+  createEffect(
+    () => visibleRequests().length,
+    () => {
+      if (followEnd) requestAnimationFrame(() => followEnd && grid && (grid.scrollTop = grid.scrollHeight));
+    },
+  );
+
+  // the columns in view, each with its place in the saved widths
+  const columns = createMemo(() =>
+    COLUMNS.map((column, index) => ({ ...column, index })).filter((column) => !preferences.hiddenColumns.includes(column.key as HideableKey)),
+  );
   // the path column takes the free space, so the list adapts when the details pane is resized
   const gridColumns = createMemo(() =>
-    preferences.columnWidths.map((width, column) => (column === PATH_COLUMN ? `minmax(${width}px, 1fr)` : `${width}px`)).join(' '),
+    columns()
+      .map(({ index }) => (index === PATH_COLUMN ? `minmax(${preferences.columnWidths[index]}px, 1fr)` : `${preferences.columnWidths[index]}px`))
+      .join(' '),
   );
   // Rows are exactly as wide as the columns (or the panel, when that is wider): a long URL is
   // cut by `truncate` in its cell instead of stretching the row past its header.
-  const rowMinWidth = createMemo(() => `${preferences.columnWidths.reduce((sum, width) => sum + width, 0)}px`);
+  const rowMinWidth = createMemo(() => `${columns().reduce((sum, { index }) => sum + (preferences.columnWidths[index] ?? 0), 0)}px`);
   const activeIndex = createMemo(() => {
     const id = activeRequestId();
     return id === null ? -1 : visibleRequests().findIndex((request) => request.id === id);
@@ -147,8 +188,9 @@ export default function RequestList(props: { onRowMenu: (at: { clientX: number; 
       aria-multiselectable="true"
       aria-activedescendant={activeRowRendered() ? rowId(activeRequestId()!) : undefined}
       tabindex="0"
-      class="relative h-full min-h-0 flex-1 overflow-auto -outline-offset-2"
+      class="relative h-full min-h-0 flex-1 overflow-auto -outline-offset-2 select-none"
       onKeyDown={onKeyDown}
+      onScroll={() => (followEnd = nearEnd())}
     >
       <div role="rowgroup" class="sticky top-0 z-10">
         <div
@@ -156,22 +198,26 @@ export default function RequestList(props: { onRowMenu: (at: { clientX: number; 
           aria-rowindex={1}
           class="grid w-full border-b border-line bg-bg-2"
           style={{ 'grid-template-columns': gridColumns(), 'min-width': rowMinWidth(), height: `${ROW_HEIGHT}px` }}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            openColumnsMenu(event);
+          }}
         >
-          <For each={COLUMNS}>
-            {(column, columnIndex) => (
+          <For each={columns()}>
+            {(column) => (
               <div role="columnheader" class="relative truncate px-2 leading-[22px] font-semibold text-fg-2">
                 {t(`network.columns.${column.key}`)}
                 <div
                   role="separator"
                   aria-orientation="vertical"
                   aria-label={t('network.resizeColumn', { column: t(`network.columns.${column.key}`) })}
-                  aria-valuenow={preferences.columnWidths[columnIndex()]}
+                  aria-valuenow={preferences.columnWidths[column.index]}
                   aria-valuemin={MIN_COLUMN_PX}
                   aria-valuemax={MAX_COLUMN_PX}
                   tabindex="0"
                   class="absolute end-0 top-0 h-full w-1.5 cursor-col-resize touch-none hover:bg-accent focus-visible:bg-accent"
-                  onPointerDown={(event) => startColumnResize(event, columnIndex())}
-                  onKeyDown={(event) => onColumnResizeKey(event, columnIndex())}
+                  onPointerDown={(event) => startColumnResize(event, column.index)}
+                  onKeyDown={(event) => onColumnResizeKey(event, column.index)}
                 />
               </div>
             )}
@@ -208,25 +254,26 @@ export default function RequestList(props: { onRowMenu: (at: { clientX: number; 
                     onClick={(event) => onRowClick(event, index())}
                     onContextMenu={(event) => onRowContextMenu(event, index(), row())}
                   >
-                    <div role="gridcell" class="min-w-0 truncate px-2 leading-[22px]">
-                      {/* same look as StatusBadge, inlined: no component per cell in the hottest list */}
-                      <span class={BADGE_CLASS} style={badgeColors(`s-${statusToken(row().status, row().error)}`)}>
-                        {COLUMNS[0]!.text(row())}
-                      </span>
-                    </div>
-                    <div role="gridcell" class="min-w-0 truncate px-2 leading-[22px]">
-                      <span class={BADGE_CLASS} style={badgeColors(`m-${methodToken(row().method)}`)}>
-                        {row().method}
-                      </span>
-                    </div>
-                    <For each={COLUMNS.slice(2)}>
+                    <For each={columns()}>
                       {(column) => (
                         <div
                           role="gridcell"
                           class="min-w-0 truncate px-2 leading-[22px]"
                           title={column.key === 'path' ? row().url : undefined}
                         >
-                          {column.text(row())}
+                          <Switch fallback={column.text(row())}>
+                            {/* same look as StatusBadge, inlined: no component per cell in the hottest list */}
+                            <Match when={column.key === 'status'}>
+                              <span class={BADGE_CLASS} style={badgeColors(`s-${statusToken(row().status, row().error)}`)}>
+                                {column.text(row())}
+                              </span>
+                            </Match>
+                            <Match when={column.key === 'method'}>
+                              <span class={BADGE_CLASS} style={badgeColors(`m-${methodToken(row().method)}`)}>
+                                {row().method}
+                              </span>
+                            </Match>
+                          </Switch>
                         </div>
                       )}
                     </For>

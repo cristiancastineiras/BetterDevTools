@@ -1,5 +1,6 @@
 import { createEffect, For } from 'solid-js';
 import { t } from '../i18n/index.ts';
+import { placeInWindow } from '../lib/place.ts';
 import { contextMenu, setContextMenu, type MenuItem } from '../state/ui.ts';
 
 /**
@@ -15,9 +16,7 @@ export default function ContextMenu() {
     returnFocusTo = document.activeElement;
     menu.showPopover();
     // open at the pointer, kept inside the panel
-    const box = menu.getBoundingClientRect();
-    menu.style.left = `${Math.max(4, Math.min(request.x, innerWidth - box.width - 4))}px`;
-    menu.style.top = `${Math.max(4, Math.min(request.y, innerHeight - box.height - 4))}px`;
+    placeInWindow(menu, request.x, request.y);
     menu.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
   });
 
@@ -62,7 +61,7 @@ export default function ContextMenu() {
       role="menu"
       tabindex="-1"
       aria-label={contextMenu()?.label ?? t('menu.requestActions')}
-      class="fixed inset-auto m-0 max-h-[80vh] min-w-52 overflow-auto rounded-md border border-line bg-bg p-1 text-fg shadow-lg"
+      class="fixed inset-auto m-0 max-h-[calc(var(--vh)*0.8)] max-w-[calc(var(--vw)-8px)] min-w-52 overflow-auto rounded-md border border-line bg-bg p-1 text-fg shadow-lg"
       onToggle={onToggle}
       onKeyDown={onKeyDown}
     >

@@ -22,7 +22,7 @@ export default function DiffView(props: { before: string; after: string; beforeL
       </p>
       <Show when={addedCount() || removedCount() ? lines() : null}>
         {(diff) => (
-          <pre class={[monoClass, 'max-h-[60vh] overflow-auto rounded-sm border border-line p-1']} tabindex="0">
+          <pre class={[monoClass, 'max-h-[calc(var(--vh)*0.6)] overflow-auto rounded-sm border border-line p-1']} tabindex="0">
             <For each={diff()} keyed={false}>
               {(line) => (
                 <div class={line().op === '+' ? 'bg-ok/15' : line().op === '-' ? 'bg-bad/15' : 'text-fg-2'}>

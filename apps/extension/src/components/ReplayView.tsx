@@ -1,5 +1,7 @@
 import {
   buildRequest,
+  parseRows,
+  rowsText,
   carriesCredentials,
   comparableText,
   envVars,
@@ -33,7 +35,11 @@ import { askConfirmation, secretsRevealed, showDialog, toggleSecrets } from '../
 import { activeWorkspace, editWorkspace } from '../state/workspaces.ts';
 import DiffView from './DiffView.tsx';
 import Tabs from './Tabs.tsx';
+import BodyEditor from './BodyEditor.tsx';
 import CodeViewer from './ui/CodeViewer.tsx';
+import KeyValueEditor from './ui/KeyValueEditor.tsx';
+import SegmentedControl from './ui/SegmentedControl.tsx';
+import UrlEditor, { type UrlEditorVariable } from './ui/UrlEditor.tsx';
 import CookieEditor from './ui/CookieEditor.tsx';
 import CopyButton from './ui/CopyButton.tsx';
 import IconButton from './ui/IconButton.tsx';
@@ -44,6 +50,37 @@ import { badgeClass, fieldClass, monoClass, sectionTitleClass } from './ui/style
 
 type ResultTab = 'response' | 'headers' | 'compare';
 type TextField = 'query' | 'headers' | 'body';
+
+/** Common header names and values offered while typing in the headers table. */
+const HEADER_NAMES = [
+  'Accept',
+  'Accept-Language',
+  'Authorization',
+  'Cache-Control',
+  'Content-Language',
+  'Content-Type',
+  'If-Match',
+  'If-Modified-Since',
+  'If-None-Match',
+  'Pragma',
+  'Prefer',
+  'Range',
+  'X-API-Key',
+  'X-Forwarded-For',
+  'X-Request-ID',
+  'X-Requested-With',
+];
+const HEADER_VALUES: Record<string, string[]> = {
+  accept: ['application/json', 'text/html', 'application/xml', '*/*'],
+  'content-type': ['application/json', 'application/x-www-form-urlencoded', 'multipart/form-data', 'text/plain', 'text/html', 'application/xml'],
+  'cache-control': ['no-cache', 'no-store', 'max-age=0'],
+  authorization: ['Bearer ', 'Basic '],
+};
+const headerValues = (name: string) => HEADER_VALUES[name.trim().toLowerCase()] ?? [];
+
+// table or bulk text, per list; kept here so the choice survives switching views
+const [queryBulk, setQueryBulk] = createSignal(false);
+const [headersBulk, setHeadersBulk] = createSignal(false);
 
 const TEXTAREA_CLASS = [fieldClass, monoClass, 'h-full min-h-40 w-full resize-none'];
 
@@ -103,6 +140,13 @@ export default function ReplayView() {
     return id === null ? null : (captureLog.get(id) ?? null);
   });
 
+  /** The active environment's variables, for colouring and completion in the URL field. */
+  const environmentVariables = createMemo<UrlEditorVariable[]>(() => {
+    const workspace = activeWorkspace();
+    const environment = workspace?.envs.find((env) => env.id === workspace.activeEnvId);
+    return (environment?.vars ?? []).filter((variable) => variable.key).map((variable) => ({ name: variable.key, value: variable.value, secret: variable.secret }));
+  });
+
   async function send() {
     if (isSending() || buildError()) return;
     const draft = snapshot(replayDraft);
@@ -151,6 +195,45 @@ export default function ReplayView() {
     />
   );
 
+  /** A list of lines (query or headers) as a table with on/off rows, or as bulk text. */
+  const listEditor = (
+    field: 'query' | 'headers',
+    separator: ':' | '=',
+    bulk: () => boolean,
+    setBulk: (value: boolean) => void,
+    label: string,
+    keySuggestions?: readonly string[],
+    valueSuggestions?: (key: string) => readonly string[],
+  ) => (
+    <div class="flex h-full min-h-40 flex-col gap-1">
+      <SegmentedControl
+        label={t('replay.table.mode')}
+        value={bulk() ? 'bulk' : 'table'}
+        onChange={(mode) => setBulk(mode === 'bulk')}
+        options={[
+          { value: 'table', label: t('replay.table.tableMode') },
+          { value: 'bulk', label: t('replay.table.bulkMode'), title: t('replay.table.bulkHint') },
+        ]}
+      />
+      <div class="min-h-0 flex-1 overflow-auto">
+        <Show when={bulk()} fallback={
+          <KeyValueEditor
+            label={label}
+            text={replayDraft[field]}
+            onText={(text) => setTextField(field, text)}
+            toRows={(text) => parseRows(text, separator)}
+            toText={(rows) => rowsText(rows, separator)}
+            keySuggestions={keySuggestions}
+            valueSuggestions={valueSuggestions}
+            onKeyDown={onFieldKeyDown}
+          />
+        }>
+          {textArea(field, label)}
+        </Show>
+      </div>
+    </div>
+  );
+
   return (
     <div class="grid h-full min-h-0 grid-cols-1 overflow-auto lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_15rem] lg:overflow-hidden">
       <form
@@ -173,19 +256,17 @@ export default function ReplayView() {
               })
             }
           />
-          <input
-            class={[fieldClass, monoClass, 'min-w-0 flex-1']}
-            aria-label={t('replay.url')}
+          <UrlEditor
+            label={t('replay.url')}
             value={replayDraft.url}
             placeholder={t('replay.urlPlaceholder')}
-            spellcheck={false}
-            onInput={(event) => {
-              const url = event.currentTarget.value;
+            variables={environmentVariables}
+            onInput={(url) =>
               editReplayDraft((draft) => {
                 draft.url = url;
-              });
-            }}
-            onKeyDown={onFieldKeyDown}
+              })
+            }
+            onSubmit={() => void send()}
           />
           <Show
             when={isSending()}
@@ -292,9 +373,15 @@ export default function ReplayView() {
             ]}
           >
             <Switch>
-              <Match when={replayTab() === 'query'}>{textArea('query', t('replay.queryLabel'))}</Match>
-              <Match when={replayTab() === 'headers'}>{textArea('headers', t('replay.headersLabel'))}</Match>
-              <Match when={replayTab() === 'body'}>{textArea('body', t('replay.bodyLabel'))}</Match>
+              <Match when={replayTab() === 'query'}>
+                {listEditor('query', '=', queryBulk, setQueryBulk, t('replay.queryLabel'))}
+              </Match>
+              <Match when={replayTab() === 'headers'}>
+                {listEditor('headers', ':', headersBulk, setHeadersBulk, t('replay.headersLabel'), HEADER_NAMES, headerValues)}
+              </Match>
+              <Match when={replayTab() === 'body'}>
+                <BodyEditor onKeyDown={onFieldKeyDown} />
+              </Match>
               <Match when={replayTab() === 'cookies'}>
                 <div class="flex flex-col gap-2 p-1">
                   <p class="text-fg-2">{t('replay.cookiesIntro')}</p>
@@ -346,8 +433,9 @@ export default function ReplayView() {
           <IconButton icon="save" label={t('detail.save')} text={t('replay.save')} onClick={saveDraft} />
           <IconButton
             icon={reveal() ? 'eye-off' : 'eye'}
-            label={reveal() ? t('common.hideSecrets') : t('common.showSecrets')}
+            label={preferences.revealSecrets ? t('common.secretsAlwaysShown') : reveal() ? t('common.hideSecrets') : t('common.showSecrets')}
             pressed={reveal()}
+            disabled={preferences.revealSecrets}
             onClick={() => toggleSecrets('replay')}
           />
         </div>

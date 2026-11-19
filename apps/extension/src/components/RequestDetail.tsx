@@ -33,6 +33,7 @@ import CookieTable from './ui/CookieTable.tsx';
 import CopyButton from './ui/CopyButton.tsx';
 import IconButton from './ui/IconButton.tsx';
 import KeyValueSection, { type Row } from './ui/KeyValueSection.tsx';
+import UrlText from './ui/UrlText.tsx';
 import MethodBadge, { StatusBadge } from './ui/MethodBadge.tsx';
 import SelectMenu from './ui/SelectMenu.tsx';
 import { monoClass, sectionTitleClass } from './ui/styles.ts';
@@ -163,30 +164,36 @@ export default function RequestDetail(props: { request: Captured }) {
 
   return (
     <article aria-label={t('detail.label')} class="flex h-full min-h-0 flex-col">
-      <div class="flex flex-wrap items-center gap-1 border-b border-line p-1">
-        <MethodBadge method={props.request.method} />
-        <StatusBadge status={props.request.status} error={props.request.error} />
-        <span class={[monoClass, 'min-w-0 flex-1 truncate']} title={props.request.url}>
-          {props.request.url}
-        </span>
-        <IconButton
-          icon="replay"
-          variant="primary"
-          label={t('detail.replayHint')}
-          text={t('detail.replay')}
-          onClick={() => openReplay(props.request)}
-        />
-        <IconButton icon="save" label={t('detail.save')} onClick={() => saveToCollection(props.request)} />
-        <CopyButton text={() => props.request.url} label={t('detail.copyUrl')} />
-        <CopyButton text={() => curlOf(props.request)} label={t('detail.copyCurl')} />
-        <IconButton
-          icon={reveal() ? 'eye-off' : 'eye'}
-          label={reveal() ? t('common.hideSecrets') : t('common.showSecrets')}
-          pressed={reveal()}
-          onClick={() => toggleSecrets(props.request.id)}
-        />
-        <IconButton icon="more" label={t('menu.moreRequestActions')} onClick={openMoreMenu} />
-        <IconButton icon="close" label={t('detail.close')} onClick={() => setActiveRequestId(null)} />
+      <div class="border-b border-line p-1">
+        {/* the full URL, wrapped over as many lines as it needs; the actions sit below it */}
+        <div class="flex items-start gap-1">
+          <MethodBadge method={props.request.method} />
+          <StatusBadge status={props.request.status} error={props.request.error} />
+          <span class={[monoClass, 'min-w-0 flex-1 [overflow-wrap:anywhere]']}>
+            <UrlText url={props.request.url} />
+          </span>
+        </div>
+        <div class="mt-1 flex flex-wrap items-center justify-end gap-1">
+          <IconButton
+            icon="replay"
+            variant="primary"
+            label={t('detail.replayHint')}
+            text={t('detail.replay')}
+            onClick={() => openReplay(props.request)}
+          />
+          <IconButton icon="save" label={t('detail.save')} onClick={() => saveToCollection(props.request)} />
+          <CopyButton text={() => props.request.url} label={t('detail.copyUrl')} />
+          <CopyButton text={() => curlOf(props.request)} label={t('detail.copyCurl')} />
+          <IconButton
+            icon={reveal() ? 'eye-off' : 'eye'}
+            label={preferences.revealSecrets ? t('common.secretsAlwaysShown') : reveal() ? t('common.hideSecrets') : t('common.showSecrets')}
+            pressed={reveal()}
+            disabled={preferences.revealSecrets}
+            onClick={() => toggleSecrets(props.request.id)}
+          />
+          <IconButton icon="more" label={t('menu.moreRequestActions')} onClick={openMoreMenu} />
+          <IconButton icon="close" label={t('detail.close')} onClick={() => setActiveRequestId(null)} />
+        </div>
       </div>
 
       <div class="min-h-0 flex-1">

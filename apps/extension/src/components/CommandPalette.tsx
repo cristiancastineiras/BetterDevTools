@@ -59,7 +59,7 @@ export default function CommandPalette(props: { commands: () => Command[] }) {
       onDismiss={closeDialog}
       label={t('palette.label')}
       lightDismiss
-      class="mx-auto mt-12 w-[32rem] max-w-[calc(100vw-2rem)]"
+      class="mx-auto mt-12 w-[32rem] max-w-[calc(var(--vw)-2rem)]"
     >
       <div class="flex flex-col gap-1 p-2">
         <input

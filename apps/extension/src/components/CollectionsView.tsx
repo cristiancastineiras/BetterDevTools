@@ -1,7 +1,11 @@
 import {
+  COLLECTION_FILES,
+  COLLECTION_FORMATS,
   createWorkspace,
   duplicateNode,
   duplicateWorkspace,
+  exportCollections,
+  type CollectionFormat,
   findNode,
   folderPaths,
   insertNode,
@@ -17,7 +21,7 @@ import { createMemo, createSignal, createUniqueId, For, Match, onSettled, Show, 
 import { t } from '../i18n/index.ts';
 import { download } from '../lib/io.ts';
 import { openSavedRequest } from '../state/replay.ts';
-import { askConfirmation, openContextMenu, type MenuItem } from '../state/ui.ts';
+import { announce, askConfirmation, openContextMenu, type MenuItem } from '../state/ui.ts';
 import { activeWorkspace, addWorkspace, deleteWorkspace, editWorkspace, selectWorkspace, workspaces } from '../state/workspaces.ts';
 import Icon from './ui/Icon.tsx';
 import IconButton from './ui/IconButton.tsx';
@@ -186,12 +190,20 @@ function editVariable(environmentId: string, change: (vars: { key: string; value
 }
 
 /** Collections view: workspaces, their request tree and their environments. */
+const EXPORT_FORMAT_NAMES: Record<CollectionFormat, string> = {
+  postman: 'Postman v2.1',
+  openapi: 'OpenAPI 3.0 (Swagger)',
+  httpie: 'HTTPie script',
+  curl: 'cURL script',
+};
+
 export default function CollectionsView(props: { onImport: () => void }) {
   const collectionsTitleId = createUniqueId();
   const environmentsTitleId = createUniqueId();
   // id of the workspace, environment or tree node being renamed
   const [renamingId, setRenamingId] = createSignal<string | null>(null);
   const [exportSecrets, setExportSecrets] = createSignal(false);
+  const [exportFormat, setExportFormat] = createSignal<'native' | CollectionFormat>('native');
 
   const environment = createMemo(() => {
     const workspace = activeWorkspace();
@@ -225,7 +237,14 @@ export default function CollectionsView(props: { onImport: () => void }) {
     }
     const copy = snapshot(workspace);
     const fileName = copy.name.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'workspace';
-    download(`${fileName}.bdt-workspace.json`, new Blob([workspaceFile(copy, includeSecrets)], { type: 'application/json' }));
+    const format = exportFormat();
+    if (format === 'native') {
+      download(`${fileName}.bdt-workspace.json`, new Blob([workspaceFile(copy, includeSecrets)], { type: 'application/json' }));
+      return;
+    }
+    const file = COLLECTION_FILES[format];
+    download(`${fileName}.${file.suffix}`, new Blob([exportCollections(copy, format, { includeSecrets })], { type: file.mime }));
+    announce(t('collections.exported', { format: EXPORT_FORMAT_NAMES[format] }));
   }
 
   function openNodeMenu(event: MouseEvent, node: TreeNode) {
@@ -323,6 +342,19 @@ export default function CollectionsView(props: { onImport: () => void }) {
                 {t('collections.deleteEllipsis')}
               </button>
               <span class="mx-1 h-5 border-s border-line" />
+              <SelectMenu
+                label={t('collections.exportFormat')}
+                value={exportFormat()}
+                onChange={(value) => setExportFormat(COLLECTION_FORMATS.find((format) => format === value) ?? 'native')}
+                options={[
+                  { value: 'native', label: 'BetterDevTools', description: t('collections.formatNotes.native') },
+                  ...COLLECTION_FORMATS.map((format) => ({
+                    value: format,
+                    label: EXPORT_FORMAT_NAMES[format],
+                    description: t(`collections.formatNotes.${format}`),
+                  })),
+                ]}
+              />
               <IconButton
                 icon="export"
                 label={t('collections.exportWorkspace')}

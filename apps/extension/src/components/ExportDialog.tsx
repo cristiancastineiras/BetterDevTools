@@ -10,7 +10,7 @@ import {
 import { createMemo, createSignal, createStore, createUniqueId, Show, snapshot } from 'solid-js';
 import { formatNumber, t } from '../i18n/index.ts';
 import { extensionVersion } from '../lib/devtools.ts';
-import { download, yieldToMain } from '../lib/io.ts';
+import { copyText, download, yieldToMain } from '../lib/io.ts';
 import { bodiesVersion, capturedCount, captureLog, selectedCount, selectedRequests, visibleRequests } from '../state/capture.ts';
 import { announce, closeDialog, openDialog, reportError, type ExportScope } from '../state/ui.ts';
 import Modal from './ui/Modal.tsx';
@@ -111,7 +111,8 @@ export default function ExportDialog() {
     setPlainTextAcknowledged(false);
   }
 
-  async function runExport() {
+  /** Builds the export and either saves it as a file or only copies it to the clipboard. */
+  async function runExport(mode: 'download' | 'copy') {
     const list = requests().slice(); // capture keeps running: export a stable snapshot
     const frozenOptions = { ...snapshot(exportOptions()) };
     const controller = new AbortController();
@@ -140,9 +141,13 @@ export default function ExportDialog() {
       const fileType = FILE_TYPES[frozenOptions.format];
       const file = new Blob(parts, { type: fileType.mime });
       const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      download(`betterdevtools-${stamp}.${fileType.extension}`, file);
+      if (mode === 'copy' && !(await copyText(await file.text()))) {
+        announce(t('status.copyFailedHint'));
+        return; // the dialog stays open so the file can still be downloaded
+      }
+      if (mode === 'download') download(`betterdevtools-${stamp}.${fileType.extension}`, file);
       announce(
-        t('status.exported', {
+        t(mode === 'copy' ? 'status.exportCopied' : 'status.exported', {
           count: formatNumber(list.length),
           format: t(`export.formats.${frozenOptions.format}`),
           size: formatBytes(file.size),
@@ -169,7 +174,7 @@ export default function ExportDialog() {
         class="flex w-[40rem] max-w-full flex-col gap-3 p-4"
         onSubmit={(event) => {
           event.preventDefault();
-          void runExport();
+          void runExport('download');
         }}
       >
         <h2 id={titleId} class="text-sm font-semibold">
@@ -369,6 +374,9 @@ export default function ExportDialog() {
               <>
                 <button type="button" class={buttonClass()} onClick={closeDialog}>
                   {t('common.close')}
+                </button>
+                <button type="button" class={buttonClass()} disabled={!canExport()} onClick={() => void runExport('copy')}>
+                  {t('export.copy')}
                 </button>
                 <button type="submit" class={buttonClass('primary')} disabled={!canExport()}>
                   {t('export.submit', { count: formatNumber(requests().length) })}

@@ -239,15 +239,15 @@ export async function fetchInInspectedPage(request: BuiltRequest, maxBytes: numb
 const COOKIE_RULE_ID = 4242;
 
 /**
- * Runs `send` with a one-request declarativeNetRequest rule that sets the Cookie header, because
- * fetch() cannot. The rule only matches this URL when this extension initiates it, and is removed
+ * Runs `send` with a one-request declarativeNetRequest rule that sets request headers fetch()
+ * cannot set (Cookie, User-Agent). The rule only matches this URL when this extension initiates it, and is removed
  * right after, so no page traffic and no stored cookie is touched.
  */
-export async function withCookieHeader<T>(url: string, cookie: string, send: () => Promise<T>): Promise<T> {
+export async function withRequestHeaders<T>(url: string, headers: Record<string, string>, send: () => Promise<T>): Promise<T> {
   const denied = await requestPermissions(['declarativeNetRequestWithHostAccess'], url);
   const rules = browser.declarativeNetRequest;
   if (denied || !rules?.updateSessionRules)
-    throw new Error(`Edited cookies were not sent: ${denied ?? 'declarativeNetRequest is unavailable'}`);
+    throw new Error(`Edited cookies or the custom user agent were not sent: ${denied ?? 'declarativeNetRequest is unavailable'}`);
   await rules.updateSessionRules({
     removeRuleIds: [COOKIE_RULE_ID],
     addRules: [
@@ -256,7 +256,7 @@ export async function withCookieHeader<T>(url: string, cookie: string, send: () 
         priority: 1,
         action: {
           type: rules.RuleActionType.MODIFY_HEADERS,
-          requestHeaders: [{ header: 'cookie', operation: rules.HeaderOperation.SET, value: cookie }],
+          requestHeaders: Object.entries(headers).map(([header, value]) => ({ header, operation: rules.HeaderOperation.SET, value })),
         },
         condition: {
           urlFilter: `|${url}|`,
@@ -270,6 +270,57 @@ export async function withCookieHeader<T>(url: string, cookie: string, send: () 
     return await send();
   } finally {
     await rules.updateSessionRules({ removeRuleIds: [COOKIE_RULE_ID] });
+  }
+}
+
+// ------------------------------------------------------------------------------ disable cache
+
+const CACHE_RULE_ID = 4243;
+
+/**
+ * Turns "disable cache" on or off for the inspected tab: a session network rule asks every
+ * request of that tab to skip the HTTP cache (Cache-Control/Pragma: no-cache), as the DevTools
+ * checkbox does. Needs access to all sites, asked when it is switched on. Resolves with why it
+ * failed, or null.
+ */
+export async function setCacheDisabled(disabled: boolean): Promise<string | null> {
+  try {
+    if (!disabled) {
+      // without the permission the API does not exist, and then there is no rule to remove
+      await browser.declarativeNetRequest?.updateSessionRules?.({ removeRuleIds: [CACHE_RULE_ID] });
+      return null;
+    }
+    // asked first: the declarativeNetRequest API only appears once this optional permission is granted
+    const api = browser.permissions;
+    if (typeof api?.request !== 'function') return 'not available in this browser’s DevTools panel';
+    const granted = await withTimeout(
+      api.request({ permissions: ['declarativeNetRequestWithHostAccess'], origins: ['http://*/*', 'https://*/*'] }),
+      PERMISSION_TIMEOUT_MS,
+      null,
+    );
+    if (!granted) return granted === null ? 'the permission prompt did not answer' : 'permission was refused';
+    const rules = browser.declarativeNetRequest;
+    if (!rules?.updateSessionRules) return 'declarativeNetRequest is unavailable here';
+    await rules.updateSessionRules({
+      removeRuleIds: [CACHE_RULE_ID],
+      addRules: [
+        {
+          id: CACHE_RULE_ID,
+          priority: 1,
+          action: {
+            type: rules.RuleActionType.MODIFY_HEADERS,
+            requestHeaders: [
+              { header: 'cache-control', operation: rules.HeaderOperation.SET, value: 'no-cache' },
+              { header: 'pragma', operation: rules.HeaderOperation.SET, value: 'no-cache' },
+            ],
+          },
+          condition: { tabIds: [browser.devtools.inspectedWindow.tabId], resourceTypes: Object.values(rules.ResourceType) },
+        },
+      ],
+    });
+    return null;
+  } catch (error) {
+    return String(error);
   }
 }
 

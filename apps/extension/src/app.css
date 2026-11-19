@@ -4,8 +4,21 @@
    GLOBAL
    ========================================================= */
 
+/* --ui-zoom is set from the "Interface size" preference. Viewport units are scaled by the zoom too,
+   so floating elements size themselves with --vw/--vh (the real window size in zoomed pixels). */
+:root {
+  --ui-zoom: 1.15;
+  --vw: calc(100vw / var(--ui-zoom));
+  --vh: calc(100vh / var(--ui-zoom));
+  /* font size (1 = 100%) and weight of regular text, set per font from Settings → General */
+  --sans-size: 1;
+  --mono-size: 1;
+  --sans-weight: 400;
+  --mono-weight: 400;
+}
+
 html {
-  zoom: 1.15;
+  zoom: var(--ui-zoom);
 }
 
 /* =========================================================
@@ -26,8 +39,84 @@ html {
   font-family: 'JetBrains Mono Variable';
   font-style: normal;
   font-display: swap;
-  font-weight: 100 800;
+  font-weight: 500 800;
   src: url('@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212;
+}
+
+/* Optional fonts for Settings → General. Latin subset, two weights each, loaded only when chosen
+   (OFL / Apache). Segoe UI, Arial, Verdana, Tahoma, Georgia, Helvetica, Consolas, Courier New and
+   Menlo cannot be redistributed: they are used when the system has them. */
+
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/roboto/files/roboto-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/roboto/files/roboto-latin-600-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: 'Fira Code';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/fira-code/files/fira-code-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: 'Fira Code';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/fira-code/files/fira-code-latin-600-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: 'Source Code Pro';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/source-code-pro/files/source-code-pro-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: 'Source Code Pro';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/source-code-pro/files/source-code-pro-latin-600-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: 'Cascadia Code';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/cascadia-code/files/cascadia-code-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: 'Cascadia Code';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/cascadia-code/files/cascadia-code-latin-600-normal.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212;
 }
 
@@ -78,9 +167,18 @@ html {
 
   /* Typography */
 
-  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* the user's own font (Settings → General), when set, goes first */
+  --font-sans: var(--font-sans-custom, 'Inter Variable'), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
-  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  /* text sizes follow the font size settings */
+  --text-xs: calc(0.75rem * var(--sans-size));
+  --text-sm: calc(0.875rem * var(--sans-size));
+  --text-base: calc(1rem * var(--sans-size));
+  --text-small: calc(11px * var(--sans-size));
+  --text-code: calc(11.5px * var(--mono-size));
+  --text-code--line-height: calc(18px * var(--mono-size));
+
+  --font-mono: var(--font-mono-custom, 'JetBrains Mono Variable'), ui-monospace, 'SFMono-Regular', Consolas, monospace;
 }
 
 /* =========================================================
@@ -199,6 +297,156 @@ html {
 }
 
 /* =========================================================
+   NAMED THEMES
+   Each one recolours the tokens above; App.tsx sets data-theme
+   and the matching color-scheme.
+   ========================================================= */
+
+:root[data-theme='atom-one-dark'] {
+  --color-bg: #282c34;
+  --color-bg-2: #21252b;
+  --color-bg-3: #2c313a;
+  --color-line: #3e4451;
+  --color-fg: #abb2bf;
+  --color-fg-2: #818896;
+  --color-accent: #61afef;
+  --color-on-accent: #1e2127;
+  --color-sel: #2c3e57;
+  --color-ok: #98c379;
+  --color-warn: #e5c07b;
+  --color-bad: #e06c75;
+  --color-mark: #4a4220;
+  --color-mark-current: #6b5a1f;
+  --color-syn-kw: #c678dd;
+  --color-syn-str: #98c379;
+  --color-syn-num: #d19a66;
+  --color-syn-com: #7f848e;
+  --color-syn-prop: #e06c75;
+  --color-syn-tag: #e06c75;
+  --color-syn-attr: #d19a66;
+}
+
+:root[data-theme='atom-one-light'] {
+  --color-bg: #fafafa;
+  --color-bg-2: #f0f0f1;
+  --color-bg-3: #e5e5e6;
+  --color-line: #d3d3d4;
+  --color-fg: #383a42;
+  --color-fg-2: #696c77;
+  --color-accent: #4078f2;
+  --color-on-accent: #ffffff;
+  --color-sel: #dbe6fd;
+  --color-ok: #50a14f;
+  --color-warn: #986801;
+  --color-bad: #e45649;
+  --color-mark: #fdf0b5;
+  --color-mark-current: #f7d96b;
+  --color-syn-kw: #a626a4;
+  --color-syn-str: #50a14f;
+  --color-syn-num: #986801;
+  --color-syn-com: #a0a1a7;
+  --color-syn-prop: #e45649;
+  --color-syn-tag: #e45649;
+  --color-syn-attr: #986801;
+}
+
+:root[data-theme='dracula'] {
+  --color-bg: #282a36;
+  --color-bg-2: #21222c;
+  --color-bg-3: #343746;
+  --color-line: #44475a;
+  --color-fg: #f8f8f2;
+  --color-fg-2: #a9afc9;
+  --color-accent: #bd93f9;
+  --color-on-accent: #282a36;
+  --color-sel: #44475a;
+  --color-ok: #50fa7b;
+  --color-warn: #ffb86c;
+  --color-bad: #ff5555;
+  --color-mark: #5a5a2a;
+  --color-mark-current: #7a7a2f;
+  --color-syn-kw: #ff79c6;
+  --color-syn-str: #f1fa8c;
+  --color-syn-num: #bd93f9;
+  --color-syn-com: #7b88b8;
+  --color-syn-prop: #8be9fd;
+  --color-syn-tag: #ff79c6;
+  --color-syn-attr: #50fa7b;
+}
+
+:root[data-theme='nord'] {
+  --color-bg: #2e3440;
+  --color-bg-2: #3b4252;
+  --color-bg-3: #434c5e;
+  --color-line: #4c566a;
+  --color-fg: #eceff4;
+  --color-fg-2: #aeb7c6;
+  --color-accent: #88c0d0;
+  --color-on-accent: #2e3440;
+  --color-sel: #405366;
+  --color-ok: #a3be8c;
+  --color-warn: #ebcb8b;
+  --color-bad: #bf616a;
+  --color-mark: #5b5230;
+  --color-mark-current: #7a6c35;
+  --color-syn-kw: #81a1c1;
+  --color-syn-str: #a3be8c;
+  --color-syn-num: #b48ead;
+  --color-syn-com: #7b88a1;
+  --color-syn-prop: #88c0d0;
+  --color-syn-tag: #81a1c1;
+  --color-syn-attr: #8fbcbb;
+}
+
+:root[data-theme='solarized-light'] {
+  --color-bg: #fdf6e3;
+  --color-bg-2: #eee8d5;
+  --color-bg-3: #e6dfc8;
+  --color-line: #d6cfb7;
+  --color-fg: #586e75;
+  --color-fg-2: #74878c;
+  --color-accent: #268bd2;
+  --color-on-accent: #ffffff;
+  --color-sel: #d5e5e8;
+  --color-ok: #859900;
+  --color-warn: #b58900;
+  --color-bad: #dc322f;
+  --color-mark: #f5e6a1;
+  --color-mark-current: #e9cf6a;
+  --color-syn-kw: #859900;
+  --color-syn-str: #2aa198;
+  --color-syn-num: #d33682;
+  --color-syn-com: #93a1a1;
+  --color-syn-prop: #268bd2;
+  --color-syn-tag: #cb4b16;
+  --color-syn-attr: #b58900;
+}
+
+:root[data-theme='solarized-dark'] {
+  --color-bg: #002b36;
+  --color-bg-2: #073642;
+  --color-bg-3: #0d414f;
+  --color-line: #1c4f5d;
+  --color-fg: #93a1a1;
+  --color-fg-2: #70868d;
+  --color-accent: #268bd2;
+  --color-on-accent: #ffffff;
+  --color-sel: #0f4b5e;
+  --color-ok: #859900;
+  --color-warn: #b58900;
+  --color-bad: #dc322f;
+  --color-mark: #4d4a10;
+  --color-mark-current: #6b6511;
+  --color-syn-kw: #859900;
+  --color-syn-str: #2aa198;
+  --color-syn-num: #d33682;
+  --color-syn-com: #586e75;
+  --color-syn-prop: #268bd2;
+  --color-syn-tag: #cb4b16;
+  --color-syn-attr: #b58900;
+}
+
+/* =========================================================
    BASE STYLES
    ========================================================= */
 
@@ -212,6 +460,14 @@ html {
   html {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+
+  body {
+    font-weight: var(--sans-weight);
+  }
+
+  .font-mono {
+    font-weight: var(--mono-weight);
   }
 
   body {
@@ -246,6 +502,8 @@ html {
 
   dialog:modal {
     overscroll-behavior: contain;
+    /* the preflight resets the margin the browser uses to centre a dialog */
+    margin: auto;
   }
 
   dialog::backdrop {

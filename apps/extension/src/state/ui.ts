@@ -4,8 +4,9 @@ import type { Captured, Draft } from '@betterdevtools/core';
 import { createSignal } from 'solid-js';
 import { t } from '../i18n/index.ts';
 import { copyText, logEvent } from '../lib/io.ts';
+import { preferences } from './preferences.ts';
 
-export type View = 'network' | 'replay' | 'collections';
+export type View = 'network' | 'replay' | 'collections' | 'discovery';
 
 export const [currentView, setCurrentView] = createSignal<View>('network');
 
@@ -101,7 +102,7 @@ export function askConfirmation(question: Omit<ConfirmationRequest, 'resolve'>):
 type RevealTarget = number | 'replay';
 const [revealedFor, setRevealedFor] = createSignal<RevealTarget | null>(null);
 
-export const secretsRevealed = (target: RevealTarget): boolean => revealedFor() === target;
+export const secretsRevealed = (target: RevealTarget): boolean => preferences.revealSecrets || revealedFor() === target;
 
 export function hideSecrets(): void {
   setRevealedFor(null);

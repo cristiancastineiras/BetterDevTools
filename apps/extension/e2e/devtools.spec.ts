@@ -153,6 +153,35 @@ test('captures live traffic with bodies in real DevTools and keeps it across nav
     expect(result).toContain('200');
     expect(result).not.toContain('failed');
     expect(privateHits()).toBe(hitsBefore + 1);
+
+    // API AutoDiscovery records what the page does from now on, and maps it into endpoints
+    const click = (selector: string, text: string) =>
+      panel.eval(`[...document.querySelectorAll(${JSON.stringify(selector)})].find((e) => e.textContent.trim() === ${JSON.stringify(text)})?.click()`);
+    await click('[role=tab]', 'Discovery');
+    await until(
+      () => panel.eval(`document.body.textContent.includes('NOT RECORDING')`),
+      (shown) => shown === true,
+      'discovery view',
+    );
+    await click('button', 'Start recording');
+    await until(
+      () => panel.eval(`document.body.textContent.includes('RECORDING')`),
+      (shown) => shown === true,
+      'discovery recording',
+    );
+    await page.evaluate(() => Promise.all(['/api/users/101', '/api/users/202', '/api/users/303'].map((p) => fetch(p).then((r) => r.text()))));
+    const discovered = await until(
+      () => panel.eval(`[...document.querySelectorAll('[role=listbox] [role=option]')].map((o) => o.textContent)`) as Promise<string[]>,
+      (options) => options.some((text) => text.includes('/api/users/{userId}') && text.includes('3 calls')),
+      'discovered endpoint',
+    );
+    expect(discovered.filter((text) => text.includes('/api/users/'))).toHaveLength(1);
+    await click('button', 'Stop & analyze');
+    await until(
+      () => panel.eval(`document.body.textContent.includes('ANALYZED')`),
+      (shown) => shown === true,
+      'discovery analyzed',
+    );
     front.close();
     panel.close();
   } finally {

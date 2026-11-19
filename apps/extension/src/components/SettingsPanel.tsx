@@ -4,11 +4,12 @@ import * as v from 'valibot';
 import { applyLocale, t, type LocalePreference } from '../i18n/index.ts';
 import { extensionVersion } from '../lib/devtools.ts';
 import { applyCaptureLimits, bodiesVersion, captureLog, refilter } from '../state/capture.ts';
-import { preferences, PreferencesSchema, updatePreferences, type Preferences } from '../state/preferences.ts';
-import { announce, closeDialog, openDialog } from '../state/ui.ts';
+import { DEFAULT_PREFERENCES, PreferenceFields, preferences, THEME_NAMES, THEMES, PreferencesSchema, updatePreferences, type Preferences } from '../state/preferences.ts';
+import { announce, askConfirmation, closeDialog, openDialog } from '../state/ui.ts';
 import IconButton from './ui/IconButton.tsx';
 import Modal from './ui/Modal.tsx';
 import SegmentedControl from './ui/SegmentedControl.tsx';
+import SelectMenu from './ui/SelectMenu.tsx';
 import { buttonClass, fieldClass, monoClass, sectionTitleClass } from './ui/styles.ts';
 
 type Section = 'general' | 'capture' | 'shortcuts' | 'privacy';
@@ -34,7 +35,7 @@ const SHORTCUTS: { keys: string; action: ShortcutKey }[] = [
   { keys: 'Ctrl+F · /', action: 'filter' },
   { keys: 'Ctrl+O', action: 'import' },
   { keys: 'Ctrl+Shift+E', action: 'export' },
-  { keys: 'Alt+1 · Alt+2 · Alt+3', action: 'views' },
+  { keys: 'Alt+1 … Alt+4', action: 'views' },
   { keys: 'R', action: 'replay' },
   { keys: 'Esc', action: 'close' },
   { keys: 'Ctrl+Enter', action: 'send' },
@@ -69,6 +70,173 @@ function NumberField(props: { label: string; unit: string; min: number; max: num
         <span class="w-16 text-fg-2">{props.unit}</span>
       </span>
     </label>
+  );
+}
+
+const SANS_FONTS = ['Segoe UI', 'system-ui', 'Arial', 'Verdana', 'Tahoma', 'Georgia', 'Roboto', 'Helvetica'];
+const MONO_FONTS = ['Cascadia Code', 'Consolas', 'Fira Code', 'Source Code Pro', 'Courier New', 'ui-monospace', 'Menlo'];
+
+const THEME_IDS = Object.keys(THEMES) as (keyof typeof THEMES)[];
+const UA_PRESETS = [
+  { name: 'Chrome · Windows', value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36' },
+  { name: 'Firefox · Windows', value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:130.0) Gecko/20100101 Firefox/130.0' },
+  { name: 'Chrome · Android', value: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36' },
+  {
+    name: 'Safari · iPhone',
+    value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+  },
+  { name: 'Googlebot', value: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' },
+  { name: 'curl', value: 'curl/8.5.0' },
+];
+
+/** The user agent sent by replays: the browser's own, a preset, or any text. */
+function UserAgentField() {
+  const set = (userAgent: string) =>
+    updatePreferences((draft) => {
+      draft.userAgent = userAgent;
+    });
+  const options = createMemo(() => {
+    const current = preferences.userAgent;
+    return [
+      { value: '', label: t('settings.userAgentDefault') },
+      ...UA_PRESETS.map((preset) => ({ value: preset.value, label: preset.name, description: preset.value })),
+      ...(current && !UA_PRESETS.some((preset) => preset.value === current)
+        ? [{ value: current, label: t('settings.userAgentCustom'), description: current }]
+        : []),
+    ];
+  });
+  return (
+    <div class="flex max-w-lg flex-col gap-1">
+      <span class={sectionTitleClass}>{t('settings.userAgent')}</span>
+      <SelectMenu class="w-56" label={t('settings.userAgent')} value={preferences.userAgent} options={options()} onChange={set} />
+      <input
+        class={[fieldClass, monoClass, 'w-full']}
+        autocomplete="off"
+        spellcheck={false}
+        maxlength={300}
+        placeholder={t('settings.userAgentPlaceholder')}
+        aria-label={t('settings.userAgent')}
+        value={preferences.userAgent}
+        onInput={(event) => {
+          const value = event.currentTarget.value.trim();
+          if (v.is(PreferenceFields.entries.userAgent, value)) set(value);
+        }}
+      />
+      <p class="text-fg-2">{t('settings.userAgentHint')}</p>
+    </div>
+  );
+}
+
+const ACCENTS = ['#8b5cf6', '#22a35a', '#e0791a', '#e5486b', '#0e9aa7'];
+
+/** Accent colour: the default blue, a few presets, or any colour from the colour picker. */
+function AccentPicker() {
+  const set = (accent: string) =>
+    updatePreferences((draft) => {
+      draft.accent = accent;
+    });
+  const swatch = (color: string, label: string, background: string) => (
+    <button
+      type="button"
+      class="size-6 cursor-pointer rounded-full border border-line aria-pressed:outline-2 aria-pressed:outline-offset-2 aria-pressed:outline-fg"
+      style={{ background }}
+      title={label}
+      aria-label={label}
+      aria-pressed={preferences.accent.toLowerCase() === color ? 'true' : 'false'}
+      onClick={() => set(color)}
+    />
+  );
+  return (
+    <div class="flex flex-wrap items-center gap-2.5" role="group" aria-label={t('settings.accent')}>
+      {swatch('', t('settings.accentDefault'), 'light-dark(#0969da, #4493f8)')}
+      <For each={ACCENTS}>{(color) => swatch(color, color, color)}</For>
+      <label class="flex cursor-pointer items-center gap-1 text-fg-2">
+        <input
+          type="color"
+          class="size-6 cursor-pointer rounded-full border border-line bg-transparent p-0"
+          value={preferences.accent || '#0969da'}
+          aria-label={t('settings.accentCustom')}
+          onInput={(event) => set(event.currentTarget.value)}
+        />
+        {t('settings.accentCustom')}
+      </label>
+    </div>
+  );
+}
+
+/** A slider with its current value, for the font size and weight. */
+function RangeField(props: { label: string; min: number; max: number; step: number; value: number; unit: string; onInput: (value: number) => void }) {
+  return (
+    <label class="flex items-center justify-between gap-2">
+      {props.label}
+      <span class="flex w-56 items-center gap-2">
+        <input
+          class="min-w-0 flex-1 cursor-pointer"
+          type="range"
+          min={props.min}
+          max={props.max}
+          step={props.step}
+          value={props.value}
+          onInput={(event) => props.onInput(event.currentTarget.valueAsNumber)}
+        />
+        <span class="w-12 text-end tabular-nums">
+          {props.value}
+          {props.unit}
+        </span>
+      </span>
+    </label>
+  );
+}
+
+/** Picks a font (the bundled one, or a common font; one stored earlier stays listed) and its size and weight. */
+function FontField(props: {
+  label: string;
+  field: 'fontSans' | 'fontMono';
+  size: 'fontSansSize' | 'fontMonoSize';
+  weight: 'fontSansWeight' | 'fontMonoWeight';
+  suggestions: string[];
+  bundled: string;
+}) {
+  const options = createMemo(() => {
+    const current = preferences[props.field];
+    const names = !current || props.suggestions.includes(current) ? props.suggestions : [current, ...props.suggestions];
+    return [{ value: '', label: t('settings.fontDefault', { name: props.bundled }) }, ...names.map((name) => ({ value: name, label: name }))];
+  });
+  const set = (key: 'fontSans' | 'fontMono' | 'fontSansSize' | 'fontMonoSize' | 'fontSansWeight' | 'fontMonoWeight', value: string | number) =>
+    updatePreferences((draft) => {
+      (draft as Record<string, unknown>)[key] = value;
+    });
+  return (
+    <div class="flex flex-col gap-1">
+      <div class="flex items-center justify-between gap-2">
+        {props.label}
+        <SelectMenu
+          class="w-56"
+          label={props.label}
+          value={preferences[props.field]}
+          options={options()}
+          onChange={(value) => set(props.field, value)}
+        />
+      </div>
+      <RangeField
+        label={t('settings.fontSize')}
+        min={70}
+        max={150}
+        step={5}
+        unit="%"
+        value={preferences[props.size]}
+        onInput={(value) => set(props.size, value)}
+      />
+      <RangeField
+        label={t('settings.fontWeight')}
+        min={300}
+        max={700}
+        step={100}
+        unit=""
+        value={preferences[props.weight]}
+        onInput={(value) => set(props.weight, value)}
+      />
+    </div>
   );
 }
 
@@ -123,13 +291,32 @@ export default function SettingsPanel() {
     announce(t('settings.limitsApplied'));
   }
 
+  async function resetSettings() {
+    const confirmed = await askConfirmation({
+      title: t('settings.resetTitle'),
+      details: [{ text: t('settings.resetDetail') }],
+      confirmLabel: t('settings.reset'),
+    });
+    if (!confirmed) return;
+    const defaults = structuredClone(DEFAULT_PREFERENCES);
+    updatePreferences((draft) => {
+      // the active workspace is a choice of data, not a setting: it stays
+      Object.assign(draft, defaults, { workspaceId: draft.workspaceId });
+    });
+    applyLocale(preferences.locale);
+    applyCaptureLimits();
+    refilter();
+    prepare(); // the capture limit fields show the new values
+    announce(t('settings.resetDone'));
+  }
+
   return (
     <Modal
       open={isOpen()}
       onOpen={prepare}
       onDismiss={closeDialog}
       labelledBy={titleId}
-      class="h-[min(36rem,calc(100vh-2rem))] w-[min(56rem,calc(100vw-2rem))] max-w-none"
+      class="m-0 h-(--vh) max-h-none w-(--vw) max-w-none rounded-none border-0"
     >
       <div class="flex h-full flex-col">
         <header class="flex items-center gap-2 border-b border-line px-4 py-2">
@@ -155,6 +342,13 @@ export default function SettingsPanel() {
                 </button>
               )}
             </For>
+            <button
+              type="button"
+              class={[buttonClass(), 'sm:mt-auto']}
+              onClick={() => void resetSettings()}
+            >
+              {t('settings.reset')}
+            </button>
           </nav>
 
           <div class="min-h-0 flex-1 overflow-auto p-4">
@@ -176,22 +370,66 @@ export default function SettingsPanel() {
                   </div>
                   <div class="flex flex-col gap-1">
                     <span class={sectionTitleClass}>{t('settings.theme')}</span>
-                    <SegmentedControl
+                    <SelectMenu
+                      class="w-56"
                       label={t('settings.theme')}
                       value={preferences.theme}
-                      onChange={setTheme}
-                      options={[
-                        {
-                          value: 'system',
-                          label: t('settings.themes.system', {
-                            current: systemIsDark() ? t('settings.themeCurrentDark') : t('settings.themeCurrentLight'),
-                          }),
-                          title: t('settings.themeSystemTitle'),
-                        },
-                        { value: 'light', label: t('settings.themes.light') },
-                        { value: 'dark', label: t('settings.themes.dark') },
-                      ]}
+                      onChange={(theme) => setTheme(theme as Preferences['theme'])}
+                      options={THEME_IDS.map((id) => ({
+                        value: id,
+                        label:
+                          id === 'system'
+                            ? t('settings.themes.system', {
+                                current: systemIsDark() ? t('settings.themeCurrentDark') : t('settings.themeCurrentLight'),
+                              })
+                            : (THEME_NAMES[id] ?? t(`settings.themes.${id as 'light' | 'dark'}`)),
+                        description:
+                          id === 'system' ? t('settings.themeSystemTitle') : t(`settings.themes.${THEMES[id] ?? 'dark'}`),
+                      }))}
                     />
+                  </div>
+                  <UserAgentField />
+                  <div class="flex flex-col gap-1">
+                    <span class={sectionTitleClass}>{t('settings.accent')}</span>
+                    <AccentPicker />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <span class={sectionTitleClass}>{t('settings.scale')}</span>
+                    <SegmentedControl
+                      label={t('settings.scale')}
+                      value={preferences.uiScale}
+                      onChange={(uiScale) =>
+                        updatePreferences((draft) => {
+                          draft.uiScale = uiScale;
+                        })
+                      }
+                      options={(['compact', 'default', 'large', 'xlarge'] as const).map((value) => ({
+                        value,
+                        label: t(`settings.scales.${value}`),
+                      }))}
+                    />
+                  </div>
+                  <div class="flex max-w-lg flex-col gap-4">
+                    <span class={sectionTitleClass}>{t('settings.fonts')}</span>
+                    <FontField label={t('settings.fontSans')} field="fontSans" size="fontSansSize" weight="fontSansWeight" suggestions={SANS_FONTS} bundled="Inter" />
+                    <FontField label={t('settings.fontMono')} field="fontMono" size="fontMonoSize" weight="fontMonoWeight" suggestions={MONO_FONTS} bundled="JetBrains Mono" />
+                    <p class="text-fg-2">{t('settings.fontHint')}</p>
+                  </div>
+                  <div class="flex max-w-lg flex-col gap-1">
+                    <label class="flex cursor-pointer items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={preferences.revealSecrets}
+                        onChange={(event) => {
+                          const checked = event.currentTarget.checked;
+                          updatePreferences((draft) => {
+                            draft.revealSecrets = checked;
+                          });
+                        }}
+                      />
+                      {t('settings.revealSecrets')}
+                    </label>
+                    <p class="text-fg-2">{t('settings.revealSecretsWarning')}</p>
                   </div>
                 </div>
               </Match>

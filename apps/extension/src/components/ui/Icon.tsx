@@ -13,6 +13,7 @@ import ChevronsUpDown from '@lucide/solid/icons/chevrons-up-down';
 import Circle from '@lucide/solid/icons/circle';
 import CircleAlert from '@lucide/solid/icons/circle-exclamation-point';
 import CircleHelp from '@lucide/solid/icons/circle-question-mark';
+import Columns from '@lucide/solid/icons/columns-3';
 import Command from '@lucide/solid/icons/command';
 import Cookie from '@lucide/solid/icons/cookie';
 import Copy from '@lucide/solid/icons/copy';
@@ -29,11 +30,13 @@ import Plus from '@lucide/solid/icons/plus';
 import RotateCcw from '@lucide/solid/icons/rotate-ccw';
 import Save from '@lucide/solid/icons/save';
 import Search from '@lucide/solid/icons/search';
-import Send from '@lucide/solid/icons/send';
+// import Send from '@lucide/solid/icons/send';
+import SendHorizontal from '@lucide/solid/icons/send-horizontal';
 import Settings from '@lucide/solid/icons/settings';
 import Trash from '@lucide/solid/icons/trash';
 import TriangleAlert from '@lucide/solid/icons/triangle-exclamation-point';
 import Undo from '@lucide/solid/icons/undo-2';
+import ZapOff from '@lucide/solid/icons/zap-off';
 import Upload from '@lucide/solid/icons/upload';
 import X from '@lucide/solid/icons/x';
 import { Dynamic } from '@solidjs/web';
@@ -52,6 +55,8 @@ const ICONS = {
   error: CircleAlert,
   expand: ChevronsUpDown,
   export: Download,
+  'cache-off': ZapOff,
+  columns: Columns,
   eye: Eye,
   'eye-off': EyeOff,
   filter: Filter,
@@ -69,7 +74,7 @@ const ICONS = {
   replay: RotateCcw,
   save: Save,
   search: Search,
-  send: Send,
+  send: SendHorizontal,
   settings: Settings,
   sourcemap: MapIcon,
   trash: Trash,

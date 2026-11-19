@@ -1,10 +1,12 @@
 // Actions on captured requests shared by the request list menu, the details header and the
 // command palette, so every entry point behaves the same.
 import { buildRequest, DEFAULT_EXPORT, draftFromEntry, exportRecord, toCurl, type Captured } from '@betterdevtools/core';
+import { createSignal } from 'solid-js';
 import { t } from '../i18n/index.ts';
+import { setCacheDisabled } from '../lib/devtools.ts';
 import { captureLog, selectAllVisible, selectedRequests, toggleRecording } from './capture.ts';
 import { openReplay } from './replay.ts';
-import { announce, copyToClipboard, openContextMenu, showDialog } from './ui.ts';
+import { announce, copyToClipboard, openContextMenu, reportError, showDialog } from './ui.ts';
 
 /** Pauses or resumes recording and says so in the status line. */
 export function toggleRecordingWithNotice(): void {
@@ -58,4 +60,27 @@ export function openRequestMenu(at: { clientX: number; clientY: number }): void 
     },
     { label: t('menu.selectAll'), run: selectAllVisible },
   ]);
+}
+
+// ------------------------------------------------------------------------------ disable cache
+
+const [cacheDisabledSignal, setCacheDisabledSignal] = createSignal(false);
+export const cacheDisabled = cacheDisabledSignal;
+
+/** Switches "disable cache" for the inspected tab; the rule is removed again when the panel closes. */
+export async function toggleDisableCache(): Promise<void> {
+  const next = !cacheDisabledSignal();
+  const problem = await setCacheDisabled(next);
+  if (problem) {
+    reportError(t('status.cacheFailed', { reason: problem }));
+    return;
+  }
+  setCacheDisabledSignal(next);
+  announce(next ? t('status.cacheOff') : t('status.cacheOn'));
+}
+
+/** Removes a rule left behind by an earlier panel session, and this one's when the panel closes. */
+export function releaseCacheRuleOnClose(): void {
+  void setCacheDisabled(false);
+  addEventListener('pagehide', () => void setCacheDisabled(false));
 }

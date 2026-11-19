@@ -45,7 +45,7 @@ export default function CopyButton(props: {
       <span
         role="status"
         class={[
-          'pointer-events-none absolute end-0 bottom-full z-20 mb-1 rounded border border-line bg-bg px-1.5 text-[11px] whitespace-nowrap',
+          'pointer-events-none absolute end-0 bottom-full z-20 mb-1 rounded border border-line bg-bg px-1.5 text-small whitespace-nowrap',
           'motion-safe:transition-opacity motion-safe:duration-150',
           {
             'opacity-0': copyState() === 'idle',

@@ -19,7 +19,7 @@ import { createSignal, createStore, snapshot } from 'solid-js';
 import * as v from 'valibot';
 import { t } from '../i18n/index.ts';
 import { db } from '../lib/db.ts';
-import { devtoolsAvailable, fetchInInspectedPage, requestOrigin, withCookieHeader } from '../lib/devtools.ts';
+import { devtoolsAvailable, fetchInInspectedPage, requestOrigin, withRequestHeaders } from '../lib/devtools.ts';
 import { bytesToBase64 } from '../lib/io.ts';
 import { preferences } from './preferences.ts';
 import { currentView, reportError, setCurrentView, setErrorMessage } from './ui.ts';
@@ -68,6 +68,8 @@ const HISTORY_LIMIT = 200;
 const HISTORY_BODY_CHARS = 256 * 1024;
 
 export const [replayDraft, setReplayDraftStore] = createStore<Draft>(emptyDraft());
+/** Changes whenever a different request is opened in the editor (not while it is being edited). */
+export const [replayVersion, setReplayVersion] = createSignal(0);
 export const [replayTab, setReplayTab] = createSignal<ReplayTab>('headers');
 export const [replayResult, setReplayResult] = createSignal<ReplayResult | null>(null);
 export const [replayHistory, setReplayHistory] = createSignal<HistoryRecord[]>([]);
@@ -76,9 +78,9 @@ export const [isSending, setIsSending] = createSignal(false);
 /** Sending from the inspected page needs the panel to be inside DevTools. */
 export const canSendFromPage = devtoolsAvailable();
 
-/** Where a send goes from: edited cookies need the extension's network rule. */
+/** Where a send goes from: edited cookies and a custom user agent need the extension's network rule. */
 export function effectiveSendFrom(draft: Pick<Draft, 'sendCookies' | 'cookies'> = replayDraft): SendFrom {
-  if (!canSendFromPage || (draft.sendCookies && draft.cookies.length > 0)) return 'extension';
+  if (!canSendFromPage || preferences.userAgent || (draft.sendCookies && draft.cookies.length > 0)) return 'extension';
   return preferences.sendFrom;
 }
 
@@ -89,6 +91,7 @@ export function editReplayDraft(change: (draft: Draft) => void): void {
 /** Opens the Replay view with a draft built from a captured request (credentials left out). */
 export function openReplay(request: Captured, tab: ReplayTab = 'headers'): void {
   setReplayDraftStore(() => draftFromEntry(request.har, request.id));
+  setReplayVersion((version) => version + 1);
   setReplayResult(null);
   setReplayTab(tab);
   if (currentView() !== 'replay') setCurrentView('replay');
@@ -97,12 +100,14 @@ export function openReplay(request: Captured, tab: ReplayTab = 'headers'): void 
 /** Opens a saved request (collections) in the Replay view. */
 export function openSavedRequest(saved: Pick<Draft, 'method' | 'url' | 'query' | 'headers' | 'body'>): void {
   setReplayDraftStore(() => ({ ...emptyDraft(), ...saved }));
+  setReplayVersion((version) => version + 1);
   setReplayResult(null);
   setCurrentView('replay');
 }
 
 export function loadHistoryRecord(record: HistoryRecord): void {
   setReplayDraftStore(() => ({ ...record.draft, credentialHeaders: [], cookies: [], sendCookies: false }));
+  setReplayVersion((version) => version + 1);
   setReplayResult(record.result);
 }
 
@@ -180,7 +185,12 @@ async function sendFromExtension(request: BuiltRequest, maxBytes: number, signal
       signal,
     });
   try {
-    const response = request.cookieHeader ? await withCookieHeader(request.url, request.cookieHeader, go) : await go();
+    // fetch() cannot set these two: a network rule sets them for this one request
+    const headers: Record<string, string> = {
+      ...(request.cookieHeader ? { cookie: request.cookieHeader } : {}),
+      ...(preferences.userAgent ? { 'user-agent': preferences.userAgent } : {}),
+    };
+    const response = Object.keys(headers).length ? await withRequestHeaders(request.url, headers, go) : await go();
     const mime = response.headers.get('content-type') ?? '';
     const { bytes, truncated } = await readResponse(response, maxBytes, signal);
     return {

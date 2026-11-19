@@ -1,6 +1,7 @@
 import { createMemo, createSignal, createUniqueId, For, Show } from 'solid-js';
 import { t } from '../../i18n/index.ts';
 import { listboxKey, type ListOption } from '../../lib/listbox.ts';
+import { uiZoom } from '../../lib/place.ts';
 import Icon from './Icon.tsx';
 import { buttonClass } from './styles.ts';
 
@@ -40,9 +41,9 @@ export default function SelectMenu(props: {
   function placeBelowTrigger(event: ToggleEvent) {
     if (event.newState !== 'open') return;
     const box = trigger.getBoundingClientRect();
-    listbox.style.minWidth = `${box.width}px`;
-    listbox.style.left = `${box.left}px`;
-    listbox.style.top = `${box.bottom + 2}px`;
+    listbox.style.minWidth = `${box.width / uiZoom()}px`;
+    listbox.style.left = `${box.left / uiZoom()}px`;
+    listbox.style.top = `${(box.bottom + 2) / uiZoom()}px`;
   }
 
   function onToggle(event: ToggleEvent) {
@@ -53,8 +54,8 @@ export default function SelectMenu(props: {
       const anchor = trigger.getBoundingClientRect();
       const list = listbox.getBoundingClientRect();
       if (list.bottom > innerHeight - 4 && anchor.top > innerHeight - anchor.bottom)
-        listbox.style.top = `${Math.max(4, anchor.top - list.height - 2)}px`;
-      if (list.right > innerWidth - 4) listbox.style.left = `${Math.max(4, innerWidth - list.width - 4)}px`;
+        listbox.style.top = `${Math.max(4, anchor.top - list.height - 2) / uiZoom()}px`;
+      if (list.right > innerWidth - 4) listbox.style.left = `${Math.max(4, innerWidth - list.width - 4) / uiZoom()}px`;
       setActiveIndex(
         Math.max(
           0,
@@ -132,7 +133,7 @@ export default function SelectMenu(props: {
         aria-label={props.label}
         tabindex="-1"
         aria-activedescendant={isOpen() && activeIndex() >= 0 ? optionId(activeIndex()) : undefined}
-        class="fixed inset-auto m-0 max-h-[min(18rem,60vh)] overflow-auto rounded-md border border-line bg-bg p-0.5 text-fg shadow-lg"
+        class="fixed inset-auto m-0 max-h-[min(18rem,calc(var(--vh)*0.6))] max-w-[calc(var(--vw)-8px)] overflow-auto rounded-md border border-line bg-bg p-0.5 text-fg shadow-lg"
         onKeyDown={onListKeyDown}
         onBeforeToggle={placeBelowTrigger}
         onToggle={onToggle}
@@ -159,7 +160,7 @@ export default function SelectMenu(props: {
               <span class="min-w-0">
                 <span class="block truncate">{option().label}</span>
                 <Show when={option().description}>
-                  <span class="block text-[11px] text-fg-2">{option().description}</span>
+                  <span class="block text-small text-fg-2">{option().description}</span>
                 </Show>
               </span>
             </div>

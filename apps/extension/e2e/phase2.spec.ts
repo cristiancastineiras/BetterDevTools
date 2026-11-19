@@ -365,6 +365,6 @@ test('custom selects by keyboard, no visible native select, accessible dialogs',
   await axe(panel, 'export dialog');
   await panel.keyboard.press('Escape');
   await panel.getByRole('button', { name: 'Settings' }).click();
-  await expect(panel.getByRole('radiogroup', { name: 'Theme' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: /^Theme:/ })).toBeVisible();
   await axe(panel, 'settings dialog');
 });

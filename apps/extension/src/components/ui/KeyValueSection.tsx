@@ -53,7 +53,7 @@ export default function KeyValueSection(props: {
           >
             <Icon name={isOpen() ? 'chevron-down' : 'chevron-right'} />
             <span class="truncate">{props.title}</span>
-            <span class="rounded-full bg-bg-3 px-1.5 text-[11px] font-normal text-fg-2">{props.rows.length}</span>
+            <span class="rounded-full bg-bg-3 px-1.5 text-small font-normal text-fg-2">{props.rows.length}</span>
           </button>
         </h3>
         <Show when={showCopy() && props.rows.length}>
@@ -66,12 +66,12 @@ export default function KeyValueSection(props: {
             <For each={props.rows} keyed={false}>
               {(row) => (
                 <div class="group grid min-h-6 grid-cols-[minmax(120px,180px)_minmax(0,1fr)_26px] gap-x-2.5 border-b border-bg-3 @max-[360px]:grid-cols-[minmax(0,1fr)_26px]">
-                  <dt class="py-0.5 font-mono text-[11.5px]/[18px] break-all text-fg-2 @max-[360px]:col-span-full @max-[360px]:pb-0">
+                  <dt class="py-0.5 font-mono text-code break-all text-fg-2 @max-[360px]:col-span-full @max-[360px]:pb-0">
                     {row().name}
                   </dt>
-                  <dd class="py-0.5 font-mono text-[11.5px]/[18px] [overflow-wrap:anywhere]">
+                  <dd class="py-0.5 font-mono text-code [overflow-wrap:anywhere]">
                     <Show when={row().tag}>
-                      <span class="me-1.5 rounded-sm border border-line px-1 font-sans text-[11px]">{row().tag}</span>
+                      <span class="me-1.5 rounded-sm border border-line px-1 font-sans text-small">{row().tag}</span>
                     </Show>
                     <Show when={isHidden(row())} fallback={row().value}>
                       <span class="text-fg-2">{t('common.hidden')}</span>

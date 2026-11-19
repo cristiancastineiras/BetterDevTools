@@ -71,7 +71,7 @@ export default function CookieEditor(props: {
                       onInput={(event) => props.onEdit(index, 'value', event.currentTarget.value)}
                     />
                     <Show when={cookie().note}>
-                      <span class="block text-[11px] text-fg-2">{cookie().note}</span>
+                      <span class="block text-small text-fg-2">{cookie().note}</span>
                     </Show>
                   </td>
                   <td class="py-0.5 whitespace-nowrap">

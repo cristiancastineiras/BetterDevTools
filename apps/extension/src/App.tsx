@@ -1,6 +1,7 @@
 import { formatBytes } from '@betterdevtools/core';
 import { createEffect, createMemo, Match, onSettled, Show, Switch } from 'solid-js';
 import CollectionsView from './components/CollectionsView.tsx';
+import DiscoveryView from './components/discovery/DiscoveryView.tsx';
 import CommandPalette, { type Command } from './components/CommandPalette.tsx';
 import CompareDialog from './components/CompareDialog.tsx';
 import ConfirmDialog from './components/ConfirmDialog.tsx';
@@ -13,7 +14,7 @@ import SettingsPanel, { setLanguage, setTheme } from './components/SettingsPanel
 import Tabs from './components/Tabs.tsx';
 import IconButton from './components/ui/IconButton.tsx';
 import { formatNumber, t } from './i18n/index.ts';
-import { curlOf, saveToCollection, toggleRecordingWithNotice } from './state/actions.ts';
+import { curlOf, releaseCacheRuleOnClose, saveToCollection, toggleRecordingWithNotice } from './state/actions.ts';
 import {
   activeRequest,
   activeRequestId,
@@ -33,7 +34,7 @@ import {
   visibleRequests,
 } from './state/capture.ts';
 import { importFile } from './state/import.ts';
-import { loadPreferences, onPreferencesSaveError, preferences } from './state/preferences.ts';
+import { loadPreferences, onPreferencesSaveError, preferences, THEMES, UI_ZOOM } from './state/preferences.ts';
 import { loadReplayHistory, openReplay } from './state/replay.ts';
 import {
   copyToClipboard,
@@ -55,6 +56,7 @@ const VIEW_SHORTCUTS = new Map<string, View>([
   ['Digit1', 'network'],
   ['Digit2', 'replay'],
   ['Digit3', 'collections'],
+  ['Digit4', 'discovery'],
 ]);
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -69,6 +71,7 @@ async function initialize(): Promise<void> {
   await Promise.race([preferencesLoaded, delay(STORAGE_WAIT_MS)]);
   applyCaptureLimits();
   startDevtoolsCapture();
+  releaseCacheRuleOnClose();
   try {
     await Promise.all([loadWorkspaces(), loadReplayHistory()]);
   } catch (error) {
@@ -113,6 +116,7 @@ export default function App() {
       { label: t('palette.goNetwork'), keys: 'Alt+1', run: () => setCurrentView('network') },
       { label: t('palette.goReplay'), keys: 'Alt+2', run: () => setCurrentView('replay') },
       { label: t('palette.goCollections'), keys: 'Alt+3', run: () => setCurrentView('collections') },
+      { label: t('palette.goDiscovery'), keys: 'Alt+4', run: () => setCurrentView('discovery') },
       { label: t('palette.settings'), run: () => showDialog({ kind: 'settings' }) },
       { label: t('palette.themeSystem'), run: () => setTheme('system') },
       { label: t('palette.themeLight'), run: () => setTheme('light') },
@@ -160,7 +164,48 @@ export default function App() {
   createEffect(
     () => preferences.theme,
     (theme) => {
-      document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', theme === 'system' ? 'light dark' : theme);
+      const scheme = THEMES[theme];
+      document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', scheme ?? 'light dark');
+      // named themes recolour the tokens in app.css through this attribute
+      if (scheme && theme !== scheme) document.documentElement.dataset.theme = theme;
+      else delete document.documentElement.dataset.theme;
+    },
+  );
+
+  // interface size and fonts: app.css reads these custom properties
+  createEffect(
+    () => ({
+      zoom: UI_ZOOM[preferences.uiScale],
+      accent: preferences.accent,
+      sans: preferences.fontSans,
+      mono: preferences.fontMono,
+      sansSize: preferences.fontSansSize,
+      monoSize: preferences.fontMonoSize,
+      sansWeight: preferences.fontSansWeight,
+      monoWeight: preferences.fontMonoWeight,
+    }),
+    ({ zoom, accent, sans, mono, sansSize, monoSize, sansWeight, monoWeight }) => {
+      const style = document.documentElement.style;
+      style.setProperty('--ui-zoom', String(zoom));
+      // the accent also tints the selection; text on it turns dark when the colour is light
+      if (accent) {
+        const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(accent.slice(i, i + 2), 16));
+        style.setProperty('--color-accent', accent);
+        style.setProperty('--color-sel', `color-mix(in srgb, ${accent} 20%, var(--color-bg))`);
+        style.setProperty('--color-on-accent', 0.299 * r! + 0.587 * g! + 0.114 * b! > 160 ? '#1f2328' : '#ffffff');
+      } else {
+        for (const property of ['--color-accent', '--color-sel', '--color-on-accent']) style.removeProperty(property);
+      }
+      style.setProperty('--sans-size', String(sansSize / 100));
+      style.setProperty('--mono-size', String(monoSize / 100));
+      style.setProperty('--sans-weight', String(sansWeight));
+      style.setProperty('--mono-weight', String(monoWeight));
+      // generic families (system-ui, monospace…) are keywords and must not be quoted
+      const family = (name: string) => (/^(ui-)?(sans-serif|serif|monospace)$|^system-ui$/.test(name) ? name : `"${name}"`);
+      for (const [property, name] of [['--font-sans-custom', sans], ['--font-mono-custom', mono]] as const) {
+        if (name) style.setProperty(property, family(name));
+        else style.removeProperty(property);
+      }
     },
   );
 
@@ -189,6 +234,7 @@ export default function App() {
               { id: 'network', label: t('app.views.network') },
               { id: 'replay', label: t('app.views.replay') },
               { id: 'collections', label: t('app.views.collections') },
+              { id: 'discovery', label: t('app.views.discovery') },
             ]}
             end={
               <>
@@ -211,6 +257,9 @@ export default function App() {
               </Match>
               <Match when={currentView() === 'collections'}>
                 <CollectionsView onImport={chooseImportFile} />
+              </Match>
+              <Match when={currentView() === 'discovery'}>
+                <DiscoveryView />
               </Match>
             </Switch>
           </Tabs>

@@ -34,11 +34,11 @@ export default function CookieTable(props: { title: string; cookies: CookieInfo[
     <section aria-label={props.title} class="mb-2">
       <div class="flex min-h-7 items-center gap-2">
         <h3 class="font-semibold">{props.title}</h3>
-        <span class="rounded-full bg-bg-3 px-1.5 text-[11px] text-fg-2">{props.cookies.length}</span>
+        <span class="rounded-full bg-bg-3 px-1.5 text-small text-fg-2">{props.cookies.length}</span>
       </div>
       <Show when={props.cookies.length} fallback={<p class="py-1 text-fg-2">{t('common.none')}</p>}>
         <div class="overflow-x-auto" tabindex="0" role="region" aria-label={t('cookies.tableLabel', { title: props.title })}>
-          <table class="w-full border-collapse font-mono text-[11.5px]">
+          <table class="w-full border-collapse font-mono text-code">
             <thead class="font-sans text-fg-2">
               <tr>
                 <th class={HEADER_CELL}>{t('cookies.columns.name')}</th>

@@ -156,3 +156,77 @@ test('the interface switches to Spanish and remembers it', async ({ panel }) => 
   await expect(panel.getByRole('tab', { name: 'Colecciones' })).toBeVisible();
   await expect(panel.locator('html')).toHaveAttribute('lang', 'es');
 });
+
+test('replay edits headers as a table with switches, in bulk too, and the body type sets Content-Type', async ({ panel }) => {
+  await importHar(panel, 'p3.har', HAR);
+  await panel.getByRole('row', { name: /\/api\/user/ }).click();
+  await panel.getByRole('button', { name: 'Replay', exact: true }).click();
+
+  await expect(panel.getByRole('combobox', { name: 'Key', exact: true }).first()).toHaveValue('accept');
+  await panel.getByRole('button', { name: 'Add', exact: true }).click();
+  await panel.getByRole('combobox', { name: 'Key', exact: true }).last().fill('X-Debug');
+  await panel.getByRole('combobox', { name: 'Value of X-Debug' }).fill('1');
+  await panel.getByRole('checkbox', { name: 'Send X-Debug' }).uncheck();
+
+  // the same rows as bulk text: a switched-off row is a # line
+  await panel.getByRole('radio', { name: 'Bulk edit' }).click();
+  await expect(panel.getByRole('textbox', { name: /^Headers/ })).toHaveValue(/accept: application\/json\n# X-Debug: 1/);
+  await panel.getByRole('radio', { name: 'Table' }).click();
+
+  await panel.getByRole('tab', { name: 'Body' }).click();
+  await choose(panel, 'Body type', /^JSON /);
+  await panel.getByRole('textbox', { name: 'Request body' }).fill('{"a":1}');
+  await panel.getByRole('tab', { name: 'Headers' }).click();
+  await panel.getByRole('radio', { name: 'Bulk edit' }).click();
+  await expect(panel.getByRole('textbox', { name: /^Headers/ })).toHaveValue(/Content-Type: application\/json/);
+});
+
+test('big JSON: coloured at any size, and the tree finds, opens and filters matches anywhere', async ({ panel }) => {
+  const users = Array.from({ length: 30_000 }, (_, i) => ({ id: i, name: `user ${i}`, city: i % 2 ? 'Madrid' : 'Lima' }));
+  const body = JSON.stringify({ users });
+  const har = JSON.parse(HAR) as { log: { entries: { request: { url: string }; response: { content: { size: number; text: string } } }[] } };
+  const entry = har.log.entries[0]!;
+  entry.request.url = 'https://api.example.com/api/users';
+  entry.response.content = { ...entry.response.content, size: body.length, text: body };
+  await importHar(panel, 'big.har', JSON.stringify(har));
+  await panel.getByRole('row', { name: /\/api\/users/ }).click();
+  await panel.getByRole('tab', { name: 'Response' }).click();
+
+  // well past the old 300 kB colour limit, the pretty view is still coloured
+  const pretty = panel.getByRole('region', { name: 'Response body (Pretty)' });
+  await expect(pretty.locator('[data-token="prop"]').first()).toHaveText('"users"');
+
+  await panel.getByRole('radio', { name: 'Tree' }).click();
+  const find = panel.getByRole('searchbox', { name: 'Find in body' });
+  await find.fill('user 2999');
+  // user 2999 and user 29990…29999
+  await expect(panel.getByRole('status').filter({ hasText: '1 of 11' })).toBeVisible();
+  const nodes = panel.getByRole('region', { name: 'JSON nodes' });
+  await expect(nodes.locator('mark').first()).toHaveText('user 2999');
+  await find.press('Shift+Enter'); // last match, deep inside the groups of 10 000 and 100
+  await expect(panel.getByRole('status').filter({ hasText: '11 of 11' })).toBeVisible();
+  await expect(nodes).toContainText('"user 29999"');
+
+  await panel.getByRole('button', { name: 'Only matches' }).click();
+  await expect(nodes.getByText('"Madrid"')).toHaveCount(0);
+  await expect(nodes.locator('mark')).toHaveCount(11);
+});
+
+test('the replay URL field colours the URL as typed, flags unknown variables and sends on Enter', async ({ panel }) => {
+  await panel.getByRole('tab', { name: 'Replay' }).click();
+  const input = panel.getByRole('textbox', { name: 'URL', exact: true });
+  await input.fill('https://api.example.com:8080/v1/users/{{userId}}?status=open&limit=50#top');
+  await expect(input).toHaveText('https://api.example.com:8080/v1/users/{{userId}}?status=open&limit=50#top');
+  await expect(input.locator('.text-syn-kw')).toHaveText('https://');
+  await expect(input.locator('.text-accent').first()).toHaveText('api.example.com');
+  await expect(input.locator('.text-syn-prop').first()).toHaveText('status');
+  await expect(input.locator('.text-syn-str').first()).toHaveText('open');
+  await expect(input.locator('.text-warn')).toHaveText('#top');
+  await expect(input.locator('.text-bad')).toHaveText('{{userId}}'); // not in the environment
+
+  // a URL is one line: pasted line breaks are dropped, and Enter sends instead of adding one
+  await input.fill('http://127.0.0.1:1/ok');
+  await input.press('Enter');
+  await expect(panel.getByRole('region', { name: 'Replay result' })).toBeVisible();
+  await expect(input).toHaveText('http://127.0.0.1:1/ok');
+});

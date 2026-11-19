@@ -1,11 +1,11 @@
 import { createUniqueId, Show } from 'solid-js';
 import { t } from '../i18n/index.ts';
-import { openRequestMenu, toggleRecordingWithNotice } from '../state/actions.ts';
-import { activeRequest, clearRequests, filterText, isRecording, refilter, selectedCount, setFilter } from '../state/capture.ts';
+import { cacheDisabled, openRequestMenu, toggleDisableCache, toggleRecordingWithNotice } from '../state/actions.ts';
+import { activeRequest, attachedToDevtools, clearRequests, filterText, isRecording, refilter, selectedCount, setFilter } from '../state/capture.ts';
 import { preferences, updatePreferences } from '../state/preferences.ts';
 import { showDialog } from '../state/ui.ts';
 import RequestDetail from './RequestDetail.tsx';
-import RequestList from './RequestList.tsx';
+import RequestList, { openColumnsMenu } from './RequestList.tsx';
 import SplitView from './SplitView.tsx';
 import Icon from './ui/Icon.tsx';
 import IconButton from './ui/IconButton.tsx';
@@ -34,6 +34,7 @@ export default function NetworkView(props: { onFilterInput: (input: HTMLInputEle
           icon={isRecording() ? 'record' : 'pause'}
           label={isRecording() ? t('network.pauseRecording') : t('network.resumeRecording')}
           text={isRecording() ? t('network.record') : t('network.paused')}
+          variant="record"
           pressed={isRecording()}
           onClick={toggleRecordingWithNotice}
         />
@@ -62,8 +63,17 @@ export default function NetworkView(props: { onFilterInput: (input: HTMLInputEle
           pressed={preferences.searchBodies}
           onClick={toggleSearchBodies}
         />
+        <IconButton
+          icon="cache-off"
+          label={t('network.disableCache')}
+          text={t('network.noCache')}
+          pressed={cacheDisabled()}
+          disabled={!attachedToDevtools}
+          onClick={() => void toggleDisableCache()}
+        />
+        <IconButton icon="columns" label={t('network.columnsMenu')} onClick={openColumnsMenu} />
         <IconButton icon="help" label={t('network.filterHelp')} popovertarget={helpId} />
-        <div id={helpId} popover="auto" class="fixed m-auto max-w-lg rounded-md border border-line bg-bg p-3 text-fg shadow-lg">
+        <div id={helpId} popover="auto" class="fixed m-auto max-h-[calc(var(--vh)-1rem)] max-w-[min(32rem,calc(var(--vw)-1rem))] overflow-auto rounded-md border border-line bg-bg p-3 text-fg shadow-lg">
           <p class={sectionTitleClass}>{t('network.filterHelpTitle')}</p>
           <p>{t('network.filterHelpText')}</p>
           <p class={[monoClass, 'mt-1']}>{FILTER_EXAMPLES}</p>

@@ -23,6 +23,21 @@ describe('viewers', () => {
     expect(prettyJson('not json')).toBeNull();
   });
 
+  it('formats JSON the same way on the native fast path and the exact path', () => {
+    // fast path: the text is what JSON.stringify would write
+    expect(prettyJson('{"a":[1,{"b":null}],"c":"x"}')).toBe('{\n  "a": [\n    1,\n    {\n      "b": null\n    }\n  ],\n  "c": "x"\n}');
+    // already indented: returned as it is
+    const indented = '{\n  "a": 1\n}';
+    expect(prettyJson(indented)).toBe(indented);
+    // things JSON.stringify would change keep their source text
+    expect(prettyJson('{"n":1.50,"e":1e3,"u":"\\u00e9","2":"b","1":"a"}')).toBe(
+      '{\n  "n": 1.50,\n  "e": 1e3,\n  "u": "\\u00e9",\n  "2": "b",\n  "1": "a"\n}',
+    );
+    expect(prettyJson('{"k":1,"k":2}')).toBe('{\n  "k": 1,\n  "k": 2\n}');
+    expect(prettyJson(' [ "a\\\\" , "b\\\\\\"c" ] ')).toBe('[\n  "a\\\\",\n  "b\\\\\\"c"\n]');
+    expect(prettyJson('[1]', { value: [1] })).toBe('[\n  1\n]');
+  });
+
   it('indents markup, skipping void elements', () => {
     expect(prettyMarkup('<a><b>x</b><br><c/></a>')).toBe('<a>\n  <b>x</b>\n  <br>\n  <c/>\n</a>');
   });

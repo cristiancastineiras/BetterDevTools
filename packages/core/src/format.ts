@@ -25,41 +25,88 @@ export function bodyText(body: Pick<Body, 'text' | 'encoding'>): string {
   return body.encoding === 'base64' ? new TextDecoder().decode(base64ToBytes(body.text)) : body.text;
 }
 
-const indent = (d: number) => '\n' + '  '.repeat(d);
+// JSON's only whitespace: space, tab, line feed, carriage return
+const isJsonSpace = (code: number) => code === 32 || code === 10 || code === 13 || code === 9;
+// what ends a number or a literal (true, false, null)
+const isJsonDelimiter = (code: number) => code === 44 || code === 93 || code === 125 || code === 58 || isJsonSpace(code);
 
 /**
- * Re-indents JSON text without parsing numbers into doubles, so 12345678901234567890 and
- * escapes survive exactly. Returns null when the text is not JSON.
+ * Re-indents JSON text exactly as written: 12345678901234567890, 1.50, "é" and key order
+ * all survive. Returns null when the text is not JSON. Pass `parsed` when the caller already ran
+ * JSON.parse on it, so a big body is parsed only once.
+ *
+ * Fast path: when serialising the parsed value gives back the very same text (what almost every
+ * API sends), the browser's native JSON.stringify produces the indented copy, about 5x faster.
+ * Anything it would change (big or 1.50-style numbers, \u escapes, numeric keys reordered,
+ * duplicate keys) fails that comparison and goes through the exact formatter instead.
  */
-export function prettyJson(text: string): string | null {
-  try {
-    JSON.parse(text);
-  } catch {
-    return null; // not JSON: caller shows the raw text
+export function prettyJson(text: string, parsed?: { value: unknown }): string | null {
+  let value: unknown;
+  if (parsed) value = parsed.value;
+  else {
+    try {
+      value = JSON.parse(text);
+    } catch {
+      return null; // not JSON: caller shows the raw text
+    }
   }
-  const out: string[] = [];
+  const indented = JSON.stringify(value, null, 2);
+  if (indented === text) return text;
+  if (JSON.stringify(value) === text) return indented;
+  return reindentJson(text);
+}
+
+/** The exact formatter: one pass over char codes, copying strings and numbers as slices. */
+function reindentJson(text: string): string {
+  const indents = ['\n'];
+  const indent = (depth: number) => (indents[depth] ??= `\n${'  '.repeat(depth)}`);
+  const length = text.length;
+  let out = '';
   let depth = 0;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i]!;
-    if (ch === '"') {
-      let j = i + 1;
-      while (text[j] !== '"') j += text[j] === '\\' ? 2 : 1;
-      out.push(text.slice(i, j + 1));
-      i = j;
-    } else if (ch === '{' || ch === '[') {
-      const close = ch === '{' ? '}' : ']';
-      let j = i + 1;
-      while (/\s/.test(text[j] ?? '')) j++;
-      if (text[j] === close) {
-        out.push(ch + close);
-        i = j;
-      } else out.push(ch + indent(++depth));
-    } else if (ch === '}' || ch === ']') out.push(indent(--depth) + ch);
-    else if (ch === ',') out.push(',' + indent(depth));
-    else if (ch === ':') out.push(': ');
-    else if (!/\s/.test(ch)) out.push(ch);
+  let i = 0;
+  while (i < length) {
+    const code = text.charCodeAt(i);
+    if (code === 34) {
+      // a string: find the closing quote that is not escaped (an odd run of backslashes escapes it)
+      let end = i;
+      for (;;) {
+        end = text.indexOf('"', end + 1);
+        let slashes = 0;
+        while (text.charCodeAt(end - 1 - slashes) === 92) slashes++;
+        if (slashes % 2 === 0) break;
+      }
+      out += text.slice(i, end + 1);
+      i = end + 1;
+    } else if (code === 123 || code === 91) {
+      let next = i + 1;
+      while (isJsonSpace(text.charCodeAt(next))) next++;
+      if (text.charCodeAt(next) === code + 2) {
+        // {} or [] (the closing bracket is the opening code + 2)
+        out += code === 123 ? '{}' : '[]';
+        i = next + 1;
+      } else {
+        out += (code === 123 ? '{' : '[') + indent(++depth);
+        i++;
+      }
+    } else if (code === 125 || code === 93) {
+      out += indent(--depth) + (code === 125 ? '}' : ']');
+      i++;
+    } else if (code === 44) {
+      out += `,${indent(depth)}`;
+      i++;
+    } else if (code === 58) {
+      out += ': ';
+      i++;
+    } else if (isJsonSpace(code)) {
+      i++;
+    } else {
+      let end = i + 1;
+      while (end < length && !isJsonDelimiter(text.charCodeAt(end))) end++;
+      out += text.slice(i, end);
+      i = end;
+    }
   }
-  return out.join('');
+  return out;
 }
 
 const VOID = /^<(area|base|br|col|embed|hr|img|input|link|meta|source|track|wbr)\b/i;

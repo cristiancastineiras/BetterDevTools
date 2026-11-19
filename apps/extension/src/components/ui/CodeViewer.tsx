@@ -8,7 +8,7 @@ import {
   graphqlOf,
   hexDump,
   isMinified,
-  jsonSummary,
+  jsonShape,
   langOf,
   prettyGraphql,
   prettyJson,
@@ -22,7 +22,7 @@ import {
 import { createMemo, createSignal, Match, onSettled, Show, Switch } from 'solid-js';
 import { formatNumber, t } from '../../i18n/index.ts';
 import { bytesToBase64 } from '../../lib/io.ts';
-import { findMatches, MAX_MATCHES } from '../../lib/search.ts';
+import { indexLines, lineCount, NO_MATCHES, searchText } from '../../lib/search.ts';
 import { copyToClipboard, openContextMenu } from '../../state/ui.ts';
 import CodeLines from './CodeLines.tsx';
 import CopyButton from './CopyButton.tsx';
@@ -38,6 +38,9 @@ import { badgeClass, fieldClass } from './styles.ts';
 const PREVIEW_CSP = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:">`;
 /** Typing in the find box waits this long before searching, so big bodies do not stutter. */
 const FIND_DEBOUNCE_MS = 80;
+/** Bodies above this size wait longer: one search of the whole tree takes a few hundred ms. */
+const BIG_BODY_CHARS = 5_000_000;
+const BIG_FIND_DEBOUNCE_MS = 300;
 /** Raw binary content is shown as base64 up to this many characters. */
 const BASE64_PREVIEW_CHARS = 64 * 1024;
 
@@ -88,13 +91,28 @@ export default function CodeViewer(props: {
   const language = createMemo(() => langOf(format()));
   const isScript = createMemo(() => language() === 'js' || language() === 'css');
   const isMinifiedCode = createMemo(() => isScript() && isMinified(text()));
-  const json = createMemo(() => (format() === 'json' ? jsonSummary(text()) : null));
+  // a big body is parsed once: for the summary, the formatter and the tree
+  const parsedJson = createMemo<{ value: unknown } | null>(() => {
+    if (format() !== 'json') return null;
+    try {
+      return { value: JSON.parse(text()) };
+    } catch {
+      return null;
+    }
+  });
+  const json = createMemo(() => {
+    const parsed = parsedJson();
+    return parsed ? jsonShape(parsed.value) : null;
+  });
 
   const prettyText = createMemo(() => {
     const source = text();
     const graphql = format() === 'graphql' ? graphqlOf(source) : null;
     if (graphql) return prettyGraphql(graphql.query) + (graphql.variables ? `\n\n# variables\n${graphql.variables}` : '');
-    if (format() === 'json') return prettyJson(source) ?? source;
+    if (format() === 'json') {
+      const parsed = parsedJson();
+      return parsed ? (prettyJson(source, parsed) ?? source) : source;
+    }
     if (language() === 'markup') return prettyMarkup(source);
     if (isMinifiedCode()) return formatCode(source, language() as 'js' | 'css');
     return source;
@@ -106,9 +124,13 @@ export default function CodeViewer(props: {
   /** The text the code view shows (and the find bar searches). */
   const shownText = createMemo(() => {
     if (mode() === 'hex') return hexText();
-    if (mode() === 'pretty' || mode() === 'tree') return prettyText();
+    if (mode() === 'tree') return ''; // the tree works on the parsed value: no formatting needed
+    if (mode() === 'pretty') return prettyText();
     return isBinary() ? rawText().slice(0, BASE64_PREVIEW_CHARS) : rawText();
   });
+
+  // where each line starts, built once per text and shared by the view and the search
+  const shownLines = createMemo(() => indexLines(shownText()));
 
   const summary = createMemo(() => {
     const jsonShape = json();
@@ -116,7 +138,7 @@ export default function CodeViewer(props: {
       t(`viewer.formats.${format()}`),
       jsonShape ? t(jsonShape.kind === 'array' ? 'viewer.jsonArray' : 'viewer.jsonObject', { count: formatNumber(jsonShape.count) }) : '',
       isMinifiedCode() ? t('viewer.minified') : '',
-      isBinary() ? '' : t('common.lines', { count: formatNumber(shownText().split('\n').length) }),
+      isBinary() || mode() === 'tree' ? '' : t('common.lines', { count: formatNumber(lineCount(shownLines())) }),
       formatBytes(props.body.size),
     ]
       .filter(Boolean)
@@ -127,23 +149,37 @@ export default function CodeViewer(props: {
 
   const [findQuery, setFindQuery] = createSignal(() => props.initialQuery ?? '');
   const [caseSensitive, setCaseSensitive] = createSignal(false);
-  const shownLines = createMemo(() => shownText().split('\n'));
-  const matches = createMemo(() => (mode() === 'preview' ? [] : findMatches(shownLines(), findQuery(), caseSensitive())));
+  // a lower-case copy for case-insensitive search, made only when such a search runs
+  let lowered: { text: string; lower: string } | null = null;
+  const lowerText = () => {
+    const current = shownText();
+    if (lowered?.text !== current) lowered = { text: current, lower: current.toLowerCase() };
+    return lowered.lower;
+  };
+  const search = createMemo(() =>
+    mode() === 'preview' || mode() === 'tree' ? NO_MATCHES : searchText(shownText(), findQuery(), caseSensitive(), lowerText),
+  );
+  // the tree searches the parsed document itself and reports its count
+  // written by the tree's own effect, hence ownedWrite
+  const [treeMatches, setTreeMatches] = createSignal({ total: 0, kept: 0 }, { ownedWrite: true });
+  const matchTotal = () => (mode() === 'tree' ? treeMatches().total : search().total);
+  const navigable = () => (mode() === 'tree' ? treeMatches().kept : search().offsets.length);
   // back to the first match whenever the matches change
   const [currentMatch, setCurrentMatch] = createSignal(() => {
-    void matches();
+    void search();
+    void treeMatches();
     return 0;
   });
-  const canNavigate = () => matches().length > 0 && mode() !== 'tree';
+  const canNavigate = () => navigable() > 0;
 
   function stepMatch(direction: 1 | -1) {
-    const total = matches().length;
+    const total = navigable();
     if (total) setCurrentMatch((index) => (index + direction + total) % total);
   }
 
   function onFindInput(value: string) {
     clearTimeout(findTimer);
-    findTimer = setTimeout(() => setFindQuery(value), FIND_DEBOUNCE_MS);
+    findTimer = setTimeout(() => setFindQuery(value), text().length > BIG_BODY_CHARS ? BIG_FIND_DEBOUNCE_MS : FIND_DEBOUNCE_MS);
   }
 
   function onFindKeyDown(event: KeyboardEvent) {
@@ -172,11 +208,10 @@ export default function CodeViewer(props: {
   }
 
   const matchCountText = () => {
-    const total = matches().length;
+    const total = matchTotal();
     if (!findQuery()) return '';
     if (!total) return t('viewer.findNone');
-    const totalText = total >= MAX_MATCHES ? `${formatNumber(MAX_MATCHES)}+` : formatNumber(total);
-    return mode() === 'tree' ? totalText : t('viewer.findMatches', { current: formatNumber(currentMatch() + 1), total: totalText });
+    return t('viewer.findMatches', { current: formatNumber(currentMatch() + 1), total: formatNumber(total) });
   };
 
   // -------------------------------------------------------------------------------- menus
@@ -289,10 +324,10 @@ export default function CodeViewer(props: {
         <Switch
           fallback={
             <CodeLines
-              text={shownText()}
+              lines={shownLines()}
               lang={mode() === 'pretty' ? language() : 'plain'}
               label={`${props.label} (${t(`viewer.modes.${mode()}`)})`}
-              matches={matches()}
+              search={search()}
               currentMatch={currentMatch()}
               fill={props.fill}
               onPick={mode() === 'raw' && isScript() ? (line, column) => setPickedPosition({ line, column }) : undefined}
@@ -300,7 +335,15 @@ export default function CodeViewer(props: {
           }
         >
           <Match when={mode() === 'tree'}>
-            <JsonTree text={text()} label={props.label} query={findQuery()} caseSensitive={caseSensitive()} />
+            <JsonTree
+              text={text()}
+              parsed={parsedJson()}
+              label={props.label}
+              query={findQuery()}
+              caseSensitive={caseSensitive()}
+              currentMatch={currentMatch()}
+              onMatches={(total, kept) => setTreeMatches({ total, kept })}
+            />
           </Match>
           <Match when={mode() === 'preview' && format() === 'image'}>
             <img
@@ -331,7 +374,7 @@ export default function CodeViewer(props: {
           </Match>
           <Match when={isBinary() && mode() === 'raw'}>
             <p class="text-fg-2">{t('viewer.binaryNotice')}</p>
-            <CodeLines text={shownText()} lang="plain" label={`${props.label} base64`} fill={props.fill} />
+            <CodeLines lines={shownLines()} lang="plain" label={`${props.label} base64`} fill={props.fill} />
           </Match>
         </Switch>
       </Show>

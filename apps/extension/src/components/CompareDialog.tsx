@@ -16,7 +16,7 @@ export default function CompareDialog() {
   });
 
   return (
-    <Modal open={pair() !== null} onDismiss={closeDialog} labelledBy={titleId} class="w-[60rem] max-w-[calc(100vw-2rem)]">
+    <Modal open={pair() !== null} onDismiss={closeDialog} labelledBy={titleId} class="w-[60rem] max-w-[calc(var(--vw)-2rem)]">
       <Show when={pair()}>
         {(requests) => {
           const first = () => requests().first;
