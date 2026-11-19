@@ -1,0 +1,37 @@
+# BetterDevTools
+
+> A browser DevTools extension (Chrome, Edge and Firefox, Manifest V3) that captures HTTP traffic, inspects large
+> responses, replays requests, builds a map of an application's API automatically (API AutoDiscovery: endpoints,
+> inferred JSON Schemas, contract validation, dependency graph, OpenAPI export) and exports traffic and collections.
+> Everything stays in the browser: no telemetry, no remote services, no permissions at install. TypeScript, Solid, WXT.
+> No license has been chosen yet.
+
+## Start here
+
+- [README](README.md): what it does, install from a release or from source, quick start, limitations.
+- [FAQ](FAQ.md): permissions, privacy, missing bodies, Firefox, export formats, AutoDiscovery heuristics.
+- [CONTRIBUTING](CONTRIBUTING.md): setup, project layout, the checks a change must pass.
+
+## Reference
+
+- [Architecture](docs/architecture.md): capability matrix, data model, budgets, risks.
+- [Decisions](docs/decisions.md): architecture decision records.
+- [Security and privacy](docs/security.md): permissions, data handling, redaction, untrusted input, API AutoDiscovery privacy.
+- [TOON v1 format](docs/toon.md): the compact export format for LLM context.
+- [Benchmarks](docs/benchmarks.md): measured numbers and how to reproduce them.
+- [Releasing](docs/releasing.md): versioning, tags, the release workflow, store publishing.
+- [Changelog](CHANGELOG.md): what changed in each version.
+- [Security policy](SECURITY.md): how to report a vulnerability.
+
+## Code map
+
+- [packages/core](packages/core/src): framework-free logic: HAR parsing, filter language, redaction, replay requests, exporters (HAR, JSON, NDJSON, CSV, TOON, Postman, OpenAPI, HTTPie, cURL), and `discovery/` (path normalisation, schema inference, contract validation, dependency graph, OpenAPI/TypeScript/Markdown/HTML export).
+- [apps/extension](apps/extension/src): the Solid UI (`components/`), state (`state/`) and the browser adapter (`lib/devtools.ts`).
+- [apps/extension/e2e](apps/extension/e2e): Playwright tests, including a real-DevTools capture test.
+
+## Known limits
+
+- Capture needs the panel opened from the browser's DevTools; HAR import works anywhere.
+- Browsers do not always give an extension a response body; incomplete captures are labelled and schemas cover only available bodies.
+- Inferred schemas describe observed traffic and are not official contracts.
+- Releases are zip files for unpacked or temporary loading; there is no store listing yet.
