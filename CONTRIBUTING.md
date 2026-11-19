@@ -60,4 +60,6 @@ Only a maintainer publishes a release, by pushing a version tag. The procedure i
 
 ## License
 
-No license has been chosen yet. Until one is added, please open an issue before starting a large contribution.
+BetterDevTools is distributed under the [Attribution Assurance License (AAL)](LICENSE). Contributions are subject to
+that license. For binary redistributions, preserve the author attribution and accompanying license text required by
+the license.

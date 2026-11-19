@@ -1,0 +1,80 @@
+name: Bug report
+description: Report a reproducible problem in BetterDevTools
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before reporting, check whether the issue is already known and do not include captured credentials,
+        authorization headers, cookies, tokens or other sensitive traffic data.
+
+        For security vulnerabilities, follow [SECURITY.md](../../../SECURITY.md) instead of opening a public issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: What happened, and what did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest sequence of steps that reproduces the problem.
+      placeholder: |
+        1. Open DevTools on ...
+        2. Choose BetterDevTools and ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Edge
+        - Firefox
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Browser version and BetterDevTools version.
+      placeholder: "Browser 143 / BetterDevTools 0.1.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Operating system and additional environment
+      description: OS and version, extension build, and any relevant DevTools settings.
+
+  - type: textarea
+    id: samples
+    attributes:
+      label: Screenshots or redacted data
+      description: Add screenshots or redacted examples only. Remove secrets before pasting them.

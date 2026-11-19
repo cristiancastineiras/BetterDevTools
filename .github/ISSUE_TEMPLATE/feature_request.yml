@@ -1,0 +1,45 @@
+name: Feature request
+description: Suggest an improvement or new capability for BetterDevTools
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem from a user perspective. Keep implementation ideas separate from the outcome you need.
+        Do not include credentials, captured traffic or sensitive application data.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What limitation or repeated task should BetterDevTools improve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the preferred behavior, workflow or interface.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches or workarounds have you tried?
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and impact
+      description: Which views or workflows would be affected, and are any privacy or compatibility considerations relevant?
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List concrete outcomes that would show that the request is complete.

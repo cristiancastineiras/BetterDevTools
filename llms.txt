@@ -4,7 +4,7 @@
 > responses, replays requests, builds a map of an application's API automatically (API AutoDiscovery: endpoints,
 > inferred JSON Schemas, contract validation, dependency graph, OpenAPI export) and exports traffic and collections.
 > Everything stays in the browser: no telemetry, no remote services, no permissions at install. TypeScript, Solid, WXT.
-> No license has been chosen yet.
+> Licensed under the Attribution Assurance License (AAL); see [LICENSE](LICENSE).
 
 ## Start here
 

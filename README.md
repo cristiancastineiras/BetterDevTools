@@ -136,4 +136,5 @@ organised as `packages/core` (framework-free logic: HAR, filters, redaction, sch
 ## Contributing, security, license
 
 Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities as described in
-[SECURITY.md](SECURITY.md). **No license has been chosen yet**, so the code is not yet available for reuse.
+[SECURITY.md](SECURITY.md). BetterDevTools is distributed under the
+[Attribution Assurance License (AAL)](LICENSE); see [LICENSE](LICENSE) for redistribution and attribution terms.
