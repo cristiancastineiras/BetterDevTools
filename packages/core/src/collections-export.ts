@@ -54,7 +54,11 @@ const VARIABLE = /\{\{\s*([\w.-]+)\s*\}\}/g;
 /** The active environment's variables as name → value, secrets blanked unless asked for. */
 function environment(ws: Workspace, options: CollectionExportOptions): Map<string, { value: string; secret: boolean }> {
   const env = ws.envs.find((e) => e.id === ws.activeEnvId);
-  return new Map((env?.vars ?? []).filter((x) => x.key).map((x) => [x.key, { value: x.secret && !options.includeSecrets ? '' : x.value, secret: x.secret }]));
+  return new Map(
+    (env?.vars ?? [])
+      .filter((x) => x.key)
+      .map((x) => [x.key, { value: x.secret && !options.includeSecrets ? '' : x.value, secret: x.secret }]),
+  );
 }
 
 // ---------------------------------------------------------------------------------- Postman
@@ -125,7 +129,10 @@ function toOpenApi(ws: Workspace, options: CollectionExportOptions): string {
       continue;
     }
     const headers = headerPairs(resolve(node.headers));
-    const contentType = headers.find(([name]) => /^content-type$/i.test(name))?.[1].split(';')[0]?.trim();
+    const contentType = headers
+      .find(([name]) => /^content-type$/i.test(name))?.[1]
+      .split(';')[0]
+      ?.trim();
     const body = resolve(node.body);
     const parsedBody = body ? jsonOrText(body) : undefined;
     const mime = contentType || (typeof parsedBody === 'string' ? 'text/plain' : 'application/json');
@@ -140,7 +147,9 @@ function toOpenApi(ws: Workspace, options: CollectionExportOptions): string {
       ...(path.length ? { tags: [path.join(' / ')] } : {}),
       parameters: [
         ...[...query].map(([name, example]) => ({ name, in: 'query', schema: { type: 'string' }, example })),
-        ...headers.filter(([name]) => !IMPLICIT_HEADERS.test(name)).map(([name, example]) => ({ name, in: 'header', schema: { type: 'string' }, example })),
+        ...headers
+          .filter(([name]) => !IMPLICIT_HEADERS.test(name))
+          .map(([name, example]) => ({ name, in: 'header', schema: { type: 'string' }, example })),
       ],
       ...(body ? { requestBody: { content: { [mime]: { example: parsedBody } } } } : {}),
       responses: { default: { description: 'Response' } },
@@ -225,7 +234,9 @@ function toScript(ws: Workspace, options: CollectionExportOptions, tool: 'curl' 
             ...(node.body ? ['--raw', word(node.body)] : []),
           ];
     const title = `# ${oneLine(node.name)}`;
-    blocks.push(heading !== group ? `\n# == ${oneLine(heading) || 'Requests'} ==\n${title}\n${parts.join(' ')}` : `${title}\n${parts.join(' ')}`);
+    blocks.push(
+      heading !== group ? `\n# == ${oneLine(heading) || 'Requests'} ==\n${title}\n${parts.join(' ')}` : `${title}\n${parts.join(' ')}`,
+    );
     group = heading;
   }
   const lines = ['#!/usr/bin/env bash', `# ${oneLine(ws.name)}, exported from BetterDevTools`];

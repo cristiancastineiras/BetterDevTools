@@ -72,7 +72,14 @@ const HEADER_NAMES = [
 ];
 const HEADER_VALUES: Record<string, string[]> = {
   accept: ['application/json', 'text/html', 'application/xml', '*/*'],
-  'content-type': ['application/json', 'application/x-www-form-urlencoded', 'multipart/form-data', 'text/plain', 'text/html', 'application/xml'],
+  'content-type': [
+    'application/json',
+    'application/x-www-form-urlencoded',
+    'multipart/form-data',
+    'text/plain',
+    'text/html',
+    'application/xml',
+  ],
   'cache-control': ['no-cache', 'no-store', 'max-age=0'],
   authorization: ['Bearer ', 'Basic '],
 };
@@ -144,7 +151,9 @@ export default function ReplayView() {
   const environmentVariables = createMemo<UrlEditorVariable[]>(() => {
     const workspace = activeWorkspace();
     const environment = workspace?.envs.find((env) => env.id === workspace.activeEnvId);
-    return (environment?.vars ?? []).filter((variable) => variable.key).map((variable) => ({ name: variable.key, value: variable.value, secret: variable.secret }));
+    return (environment?.vars ?? [])
+      .filter((variable) => variable.key)
+      .map((variable) => ({ name: variable.key, value: variable.value, secret: variable.secret }));
   });
 
   async function send() {
@@ -216,18 +225,21 @@ export default function ReplayView() {
         ]}
       />
       <div class="min-h-0 flex-1 overflow-auto">
-        <Show when={bulk()} fallback={
-          <KeyValueEditor
-            label={label}
-            text={replayDraft[field]}
-            onText={(text) => setTextField(field, text)}
-            toRows={(text) => parseRows(text, separator)}
-            toText={(rows) => rowsText(rows, separator)}
-            keySuggestions={keySuggestions}
-            valueSuggestions={valueSuggestions}
-            onKeyDown={onFieldKeyDown}
-          />
-        }>
+        <Show
+          when={bulk()}
+          fallback={
+            <KeyValueEditor
+              label={label}
+              text={replayDraft[field]}
+              onText={(text) => setTextField(field, text)}
+              toRows={(text) => parseRows(text, separator)}
+              toText={(rows) => rowsText(rows, separator)}
+              keySuggestions={keySuggestions}
+              valueSuggestions={valueSuggestions}
+              onKeyDown={onFieldKeyDown}
+            />
+          }
+        >
           {textArea(field, label)}
         </Show>
       </div>
@@ -373,9 +385,7 @@ export default function ReplayView() {
             ]}
           >
             <Switch>
-              <Match when={replayTab() === 'query'}>
-                {listEditor('query', '=', queryBulk, setQueryBulk, t('replay.queryLabel'))}
-              </Match>
+              <Match when={replayTab() === 'query'}>{listEditor('query', '=', queryBulk, setQueryBulk, t('replay.queryLabel'))}</Match>
               <Match when={replayTab() === 'headers'}>
                 {listEditor('headers', ':', headersBulk, setHeadersBulk, t('replay.headersLabel'), HEADER_NAMES, headerValues)}
               </Match>
@@ -433,7 +443,9 @@ export default function ReplayView() {
           <IconButton icon="save" label={t('detail.save')} text={t('replay.save')} onClick={saveDraft} />
           <IconButton
             icon={reveal() ? 'eye-off' : 'eye'}
-            label={preferences.revealSecrets ? t('common.secretsAlwaysShown') : reveal() ? t('common.hideSecrets') : t('common.showSecrets')}
+            label={
+              preferences.revealSecrets ? t('common.secretsAlwaysShown') : reveal() ? t('common.hideSecrets') : t('common.showSecrets')
+            }
             pressed={reveal()}
             disabled={preferences.revealSecrets}
             onClick={() => toggleSecrets('replay')}

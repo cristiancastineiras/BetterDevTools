@@ -67,7 +67,9 @@ const urlColours = ViewPlugin.fromClass(
       const known = new Set(view.state.facet(variablesFacet).map((variable) => variable.name));
       const ranges = [
         ...urlTokens(text).map((token) => PART_MARKS[token.kind].range(token.from, token.to)),
-        ...urlVariables(text).map((variable) => (known.has(variable.name) ? KNOWN_VARIABLE : UNKNOWN_VARIABLE).range(variable.from, variable.to)),
+        ...urlVariables(text).map((variable) =>
+          (known.has(variable.name) ? KNOWN_VARIABLE : UNKNOWN_VARIABLE).range(variable.from, variable.to),
+        ),
       ];
       return Decoration.set(ranges, true);
     }
@@ -85,21 +87,23 @@ function variableCompletions(context: CompletionContext) {
   return {
     from,
     filter: true,
-    options: context.state.facet(variablesFacet).map(
-      (variable): Completion => ({
-        label: variable.name,
-        type: 'variable',
-        // a secret is never written out in the list
-        detail: variable.secret ? '••••••' : variable.value.length > MAX_VALUE_PREVIEW ? `${variable.value.slice(0, MAX_VALUE_PREVIEW)}…` : variable.value,
-        apply: (view, _completion, start, end) => {
-          // swallow braces already after the cursor, so "{{ba|}}" does not become "{{base}}}}"
-          const after = view.state.doc.sliceString(end, end + 2);
-          const close = after === '}}' ? 2 : after.startsWith('}') ? 1 : 0;
-          const insert = `${variable.name}}}`;
-          view.dispatch({ changes: { from: start, to: end + close, insert }, selection: { anchor: start + insert.length } });
-        },
-      }),
-    ),
+    options: context.state.facet(variablesFacet).map((variable): Completion => ({
+      label: variable.name,
+      type: 'variable',
+      // a secret is never written out in the list
+      detail: variable.secret
+        ? '••••••'
+        : variable.value.length > MAX_VALUE_PREVIEW
+          ? `${variable.value.slice(0, MAX_VALUE_PREVIEW)}…`
+          : variable.value,
+      apply: (view, _completion, start, end) => {
+        // swallow braces already after the cursor, so "{{ba|}}" does not become "{{base}}}}"
+        const after = view.state.doc.sliceString(end, end + 2);
+        const close = after === '}}' ? 2 : after.startsWith('}') ? 1 : 0;
+        const insert = `${variable.name}}}`;
+        view.dispatch({ changes: { from: start, to: end + close, insert }, selection: { anchor: start + insert.length } });
+      },
+    })),
   };
 }
 
@@ -124,7 +128,13 @@ const theme = EditorView.theme({
   '.cm-tooltip-autocomplete > ul > li': { padding: '2px 8px', display: 'flex', gap: '12px', alignItems: 'baseline' },
   '.cm-tooltip-autocomplete > ul > li[aria-selected]': { backgroundColor: 'var(--color-sel)', color: 'var(--color-fg)' },
   '.cm-completionLabel': { flexShrink: '0' },
-  '.cm-completionDetail': { marginLeft: 'auto', fontStyle: 'normal', color: 'var(--color-fg-2)', overflow: 'hidden', textOverflow: 'ellipsis' },
+  '.cm-completionDetail': {
+    marginLeft: 'auto',
+    fontStyle: 'normal',
+    color: 'var(--color-fg-2)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
   '.cm-completionIcon': { display: 'none' },
   '.cm-completionMatchedText': { textDecoration: 'none', fontWeight: '700', color: 'var(--color-accent)' },
 });
@@ -155,11 +165,19 @@ export function createUrlEditor(host: HTMLElement, options: UrlEditorOptions): U
             const text = event.clipboardData?.getData('text/plain');
             if (text === undefined || !/[\r\n]/.test(text)) return false;
             event.preventDefault();
-            editor.dispatch(editor.state.replaceSelection(text.replace(/\s*[\r\n]+\s*/g, '')), { userEvent: 'input.paste', scrollIntoView: true });
+            editor.dispatch(editor.state.replaceSelection(text.replace(/\s*[\r\n]+\s*/g, '')), {
+              userEvent: 'input.paste',
+              scrollIntoView: true,
+            });
             return true;
           },
         }),
-        Prec.high(keymap.of([{ key: 'Enter', run: submit }, { key: 'Mod-Enter', run: submit }])),
+        Prec.high(
+          keymap.of([
+            { key: 'Enter', run: submit },
+            { key: 'Mod-Enter', run: submit },
+          ]),
+        ),
         keymap.of([...historyKeymap, ...standardKeymap]),
         // the list lives inside the field's own box (not fixed on the page), so the interface zoom cannot misplace it
         tooltips({ parent: host, position: 'absolute' }),

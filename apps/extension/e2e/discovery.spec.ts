@@ -6,7 +6,13 @@ const TOKEN = 'live-secret-token-9f8e7d6c5b4a';
 /** A small web app's traffic: login, profile with the token, and a few users. */
 function appTraffic(): string {
   const start = Date.now();
-  const entry = (i: number, method: string, url: string, response: unknown, options: { authorized?: boolean; body?: unknown; status?: number } = {}) => ({
+  const entry = (
+    i: number,
+    method: string,
+    url: string,
+    response: unknown,
+    options: { authorized?: boolean; body?: unknown; status?: number } = {},
+  ) => ({
     startedDateTime: new Date(start + i * 300).toISOString(),
     time: 20 + i,
     _resourceType: 'fetch',
@@ -42,7 +48,13 @@ function appTraffic(): string {
   return JSON.stringify({
     log: {
       entries: [
-        entry(0, 'POST', `${api}/api/auth/login`, { token: TOKEN, userId: 4242 }, { body: { email: 'ana@example.com', password: 'hunter2-secret' } }),
+        entry(
+          0,
+          'POST',
+          `${api}/api/auth/login`,
+          { token: TOKEN, userId: 4242 },
+          { body: { email: 'ana@example.com', password: 'hunter2-secret' } },
+        ),
         entry(1, 'GET', `${api}/api/profile`, { id: 4242, email: 'ana@example.com', name: 'Ana', active: true }, { authorized: true }),
         entry(2, 'GET', `${api}/api/users/4242`, { id: 4242, name: 'Ana', role: 'admin' }, { authorized: true }),
         entry(3, 'GET', `${api}/api/users/7`, { id: 7, name: 'Bo', role: 'user', nick: null }, { authorized: true }),
@@ -90,7 +102,10 @@ test('API AutoDiscovery maps endpoints, schemas, dependencies and contracts with
   // exports carry structure and no credentials
   await panel.getByRole('tab', { name: 'Endpoints' }).click();
   await choose(panel, 'Export format', 'OpenAPI 3.1 (YAML)');
-  const [download] = await Promise.all([panel.waitForEvent('download'), panel.getByRole('button', { name: 'Export', exact: true }).click()]);
+  const [download] = await Promise.all([
+    panel.waitForEvent('download'),
+    panel.getByRole('button', { name: 'Export', exact: true }).click(),
+  ]);
   const path = await download.path();
   const { readFileSync } = await import('node:fs');
   const yaml = readFileSync(path, 'utf8');
@@ -118,5 +133,9 @@ test('API AutoDiscovery maps endpoints, schemas, dependencies and contracts with
   expect(stored).not.toContain('ana@example.com');
 
   const { violations } = await new AxeBuilder({ page: panel }).analyze();
-  expect(violations.filter((v) => v.impact === 'critical' || v.impact === 'serious').map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
+  expect(
+    violations
+      .filter((v) => v.impact === 'critical' || v.impact === 'serious')
+      .map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`),
+  ).toEqual([]);
 });

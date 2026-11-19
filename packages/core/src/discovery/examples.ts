@@ -11,7 +11,15 @@ const PERSONAL_KEY =
 /** Keys that mean a person is described here, which makes a plain `name` personal too. */
 const PERSON_HINT = /^(e-?mail|phone|mobile|first_?name|last_?name|sur_?name|birth|dob|dni|ssn)/i;
 
-export const MASK = { secret: '[REDACTED]', personal: '[personal data]', email: '[email]', jwt: '[jwt]', token: '[token]', card: '[card]', ip: '[ip]' };
+export const MASK = {
+  secret: '[REDACTED]',
+  personal: '[personal data]',
+  email: '[email]',
+  jwt: '[jwt]',
+  token: '[token]',
+  card: '[card]',
+  ip: '[ip]',
+};
 
 const LIMITS = { depth: 6, items: 3, keys: 30, stringChars: 120, exampleChars: 2000 };
 
@@ -44,7 +52,13 @@ export function scrubString(text: string): string {
 export function sanitizeValue(value: unknown, key = '', depth = 0, personNearby = false): unknown {
   if (key && SECRET_KEY.test(key)) return MASK.secret;
   if (key && (PERSONAL_KEY.test(key) || (personNearby && /^(name|title)$/i.test(key)))) {
-    return typeof value === 'string' ? MASK.personal : typeof value === 'number' ? 0 : typeof value === 'object' && value !== null ? '…' : value;
+    return typeof value === 'string'
+      ? MASK.personal
+      : typeof value === 'number'
+        ? 0
+        : typeof value === 'object' && value !== null
+          ? '…'
+          : value;
   }
   if (typeof value === 'string') return scrubString(value);
   if (typeof value !== 'object' || value === null) return value;
@@ -78,7 +92,7 @@ export function exampleUrl(url: string): string {
   parsed.username = '';
   parsed.password = '';
   parsed.hash = '';
-  for (const [name, value] of [...parsed.searchParams]) parsed.searchParams.set(name, exampleParam(name, value));
+  for (const [name, value] of Array.from(parsed.searchParams)) parsed.searchParams.set(name, exampleParam(name, value));
   parsed.pathname = parsed.pathname
     .split('/')
     .map((segment) => {
@@ -87,5 +101,8 @@ export function exampleUrl(url: string): string {
     })
     .join('/');
   // the masks are readable text, not percent-encoded
-  return parsed.href.replace(/%5B(REDACTED|personal(?:%20|\+)data|email|jwt|token|card|ip)%5D/g, (_all, name: string) => `[${name.replace(/%20|\+/, ' ')}]`);
+  return parsed.href.replace(
+    /%5B(REDACTED|personal(?:%20|\+)data|email|jwt|token|card|ip)%5D/g,
+    (_all, name: string) => `[${name.replace(/%20|\+/, ' ')}]`,
+  );
 }

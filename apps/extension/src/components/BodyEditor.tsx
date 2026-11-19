@@ -37,6 +37,27 @@ const TYPE_NAMES: Record<BodyTypeId, string> = {
 };
 const JSON_LIMIT_CHARS = 200_000;
 
+const setBody = (body: string) =>
+  editReplayDraft((draft) => {
+    draft.body = body;
+  });
+
+/** The boundary of the Content-Type header (a new one when it has none). */
+function boundary(): string {
+  return multipartBoundary(getHeader(replayDraft.headers, 'content-type')) ?? newBoundary();
+}
+
+/** Writes the rows as the multipart body, tied to the boundary of the Content-Type header (made if missing). */
+function writeMultipart(rows: Row[]) {
+  const current = multipartBoundary(getHeader(replayDraft.headers, 'content-type'));
+  const used = current ?? newBoundary();
+  editReplayDraft((draft) => {
+    draft.body = multipartBody(rows, used);
+    if (!current) draft.headers = setHeader(draft.headers, 'Content-Type', `multipart/form-data; boundary=${used}`);
+  });
+  return multipartBody(rows, used);
+}
+
 /**
  * The Body tab of Replay: pick the body type (JSON, text, XML, form fields, GraphQL…) and edit it
  * the way that type is edited. Like Postman, choosing a type also sets the Content-Type header.
@@ -55,11 +76,6 @@ export default function BodyEditor(props: { onKeyDown: (event: KeyboardEvent) =>
     setGraphql(graphqlParts(draft.body));
   });
 
-  const setBody = (body: string) =>
-    editReplayDraft((draft) => {
-      draft.body = body;
-    });
-
   function switchTo(next: BodyTypeId) {
     const previous = type();
     if (next === previous) return;
@@ -77,20 +93,6 @@ export default function BodyEditor(props: { onKeyDown: (event: KeyboardEvent) =>
     });
     if (next === 'graphql') setGraphql(graphqlParts(body));
     setType(next);
-  }
-
-  // multipart bodies are tied to the boundary of the Content-Type header
-  function boundary(): string {
-    return multipartBoundary(getHeader(replayDraft.headers, 'content-type')) ?? newBoundary();
-  }
-  function writeMultipart(rows: Row[]) {
-    const current = multipartBoundary(getHeader(replayDraft.headers, 'content-type'));
-    const used = current ?? newBoundary();
-    editReplayDraft((draft) => {
-      draft.body = multipartBody(rows, used);
-      if (!current) draft.headers = setHeader(draft.headers, 'Content-Type', `multipart/form-data; boundary=${used}`);
-    });
-    return multipartBody(rows, used);
   }
 
   const lang = createMemo(() => BODY_TYPE_INFO[type()].lang);
@@ -135,7 +137,13 @@ export default function BodyEditor(props: { onKeyDown: (event: KeyboardEvent) =>
           }))}
         />
         <Show when={type() === 'json'}>
-          <IconButton icon="expand" label={t('replay.bodyEditor.format')} text={t('replay.bodyEditor.format')} disabled={jsonProblem() || !replayDraft.body.trim()} onClick={formatJson} />
+          <IconButton
+            icon="expand"
+            label={t('replay.bodyEditor.format')}
+            text={t('replay.bodyEditor.format')}
+            disabled={jsonProblem() || !replayDraft.body.trim()}
+            onClick={formatJson}
+          />
         </Show>
       </div>
 

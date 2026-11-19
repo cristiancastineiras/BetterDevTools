@@ -48,8 +48,15 @@ const camel = (text: string) =>
 /** Parameter name from the segment before it: users/123 → userId; a non-id kind → user. */
 export function paramName(previous: string | undefined, kind: ParamKind): string {
   const base = previous && !previous.startsWith('{') ? camel(singular(previous)) : '';
-  if (!base) return kind === 'integer' || kind === 'uuid' || kind === 'objectId' || kind === 'ulid' || kind === 'hash' || kind === 'token' ? 'id' : kind;
-  return kind === 'slug' || kind === 'date' || kind === 'email' ? (kind === 'slug' ? base : `${base}${kind[0]!.toUpperCase()}${kind.slice(1)}`) : `${base}Id`;
+  if (!base)
+    return kind === 'integer' || kind === 'uuid' || kind === 'objectId' || kind === 'ulid' || kind === 'hash' || kind === 'token'
+      ? 'id'
+      : kind;
+  return kind === 'slug' || kind === 'date' || kind === 'email'
+    ? kind === 'slug'
+      ? base
+      : `${base}${kind[0]!.toUpperCase()}${kind.slice(1)}`
+    : `${base}Id`;
 }
 
 export interface PathParam {

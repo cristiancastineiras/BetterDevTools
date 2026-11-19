@@ -1,7 +1,16 @@
 import { createUniqueId, Show } from 'solid-js';
 import { t } from '../i18n/index.ts';
 import { cacheDisabled, openRequestMenu, toggleDisableCache, toggleRecordingWithNotice } from '../state/actions.ts';
-import { activeRequest, attachedToDevtools, clearRequests, filterText, isRecording, refilter, selectedCount, setFilter } from '../state/capture.ts';
+import {
+  activeRequest,
+  attachedToDevtools,
+  clearRequests,
+  filterText,
+  isRecording,
+  refilter,
+  selectedCount,
+  setFilter,
+} from '../state/capture.ts';
 import { preferences, updatePreferences } from '../state/preferences.ts';
 import { showDialog } from '../state/ui.ts';
 import RequestDetail from './RequestDetail.tsx';
@@ -73,7 +82,11 @@ export default function NetworkView(props: { onFilterInput: (input: HTMLInputEle
         />
         <IconButton icon="columns" label={t('network.columnsMenu')} onClick={openColumnsMenu} />
         <IconButton icon="help" label={t('network.filterHelp')} popovertarget={helpId} />
-        <div id={helpId} popover="auto" class="fixed m-auto max-h-[calc(var(--vh)-1rem)] max-w-[min(32rem,calc(var(--vw)-1rem))] overflow-auto rounded-md border border-line bg-bg p-3 text-fg shadow-lg">
+        <div
+          id={helpId}
+          popover="auto"
+          class="fixed m-auto max-h-[calc(var(--vh)-1rem)] max-w-[min(32rem,calc(var(--vw)-1rem))] overflow-auto rounded-md border border-line bg-bg p-3 text-fg shadow-lg"
+        >
           <p class={sectionTitleClass}>{t('network.filterHelpTitle')}</p>
           <p>{t('network.filterHelpText')}</p>
           <p class={[monoClass, 'mt-1']}>{FILTER_EXAMPLES}</p>

@@ -41,8 +41,36 @@ function leafClass(value: JsonValue): string {
 /** Text with the search matches wrapped in <mark>. */
 function Highlighted(props: { text: string; query: string; caseSensitive: boolean }) {
   return (
-    <For each={splitByQuery(props.text, props.query, props.caseSensitive)}>{(piece) => (piece.hit ? <mark>{piece.text}</mark> : piece.text)}</For>
+    <For each={splitByQuery(props.text, props.query, props.caseSensitive)}>
+      {(piece) => (piece.hit ? <mark>{piece.text}</mark> : piece.text)}
+    </For>
   );
+}
+
+const summary = (value: JsonValue) => {
+  if (!isContainer(value)) return '';
+  const count = formatNumber(entryCount(value));
+  return Array.isArray(value) ? `[…] ${t('tree.items', { count })}` : `{…} ${t('tree.keys', { count })}`;
+};
+const shownLeaf = (value: JsonValue) => {
+  const text = leafText(value);
+  return text.length > SHOWN_VALUE_CHARS ? `${text.slice(0, SHOWN_VALUE_CHARS)}…` : text;
+};
+
+function openRowMenu(event: MouseEvent, row: NodeRow) {
+  event.preventDefault();
+  const path = pathText(rowPath(row));
+  openContextMenu(event, t('tree.rowActions'), [
+    {
+      label: t('tree.copyValue'),
+      run: () =>
+        void copyToClipboard(
+          isContainer(row.value) ? valueJson(row.value) : typeof row.value === 'string' ? row.value : leafText(row.value),
+          t('tree.value'),
+        ),
+    },
+    { label: t('tree.copyPath'), run: () => void copyToClipboard(path, path) },
+  ]);
 }
 
 /**
@@ -140,32 +168,6 @@ export default function JsonTree(props: {
     setTooLarge(false);
     setOpen(new Set<string>());
   }
-
-  function openRowMenu(event: MouseEvent, row: NodeRow) {
-    event.preventDefault();
-    const path = pathText(rowPath(row));
-    openContextMenu(event, t('tree.rowActions'), [
-      {
-        label: t('tree.copyValue'),
-        run: () =>
-          void copyToClipboard(
-            isContainer(row.value) ? valueJson(row.value) : typeof row.value === 'string' ? row.value : leafText(row.value),
-            t('tree.value'),
-          ),
-      },
-      { label: t('tree.copyPath'), run: () => void copyToClipboard(path, path) },
-    ]);
-  }
-
-  const summary = (value: JsonValue) => {
-    if (!isContainer(value)) return '';
-    const count = formatNumber(entryCount(value));
-    return Array.isArray(value) ? `[…] ${t('tree.items', { count })}` : `{…} ${t('tree.keys', { count })}`;
-  };
-  const shownLeaf = (value: JsonValue) => {
-    const text = leafText(value);
-    return text.length > SHOWN_VALUE_CHARS ? `${text.slice(0, SHOWN_VALUE_CHARS)}…` : text;
-  };
 
   return (
     <section aria-label={t('tree.label', { label: props.label })} class="flex min-h-0 flex-1 flex-col gap-1">

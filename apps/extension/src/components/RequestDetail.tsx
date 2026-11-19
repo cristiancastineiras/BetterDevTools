@@ -186,7 +186,9 @@ export default function RequestDetail(props: { request: Captured }) {
           <CopyButton text={() => curlOf(props.request)} label={t('detail.copyCurl')} />
           <IconButton
             icon={reveal() ? 'eye-off' : 'eye'}
-            label={preferences.revealSecrets ? t('common.secretsAlwaysShown') : reveal() ? t('common.hideSecrets') : t('common.showSecrets')}
+            label={
+              preferences.revealSecrets ? t('common.secretsAlwaysShown') : reveal() ? t('common.hideSecrets') : t('common.showSecrets')
+            }
             pressed={reveal()}
             disabled={preferences.revealSecrets}
             onClick={() => toggleSecrets(props.request.id)}

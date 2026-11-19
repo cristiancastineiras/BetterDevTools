@@ -15,7 +15,8 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary: 'border-accent bg-accent text-on-accent hover:brightness-110 active:brightness-95',
   ghost: 'border-transparent bg-transparent text-fg hover:bg-bg-3 active:bg-line aria-pressed:bg-sel',
   // the recording toggle: red dot and red button while it is pressed (recording)
-  record: 'border-line bg-bg-2 text-fg hover:bg-bg-3 active:bg-line aria-pressed:border-bad aria-pressed:bg-bad/10 aria-pressed:text-bad aria-pressed:[&_svg]:fill-current',
+  record:
+    'border-line bg-bg-2 text-fg hover:bg-bg-3 active:bg-line aria-pressed:border-bad aria-pressed:bg-bad/10 aria-pressed:text-bad aria-pressed:[&_svg]:fill-current',
 };
 
 /** Classes for a native <button>. `iconOnly` makes it square (no side padding). */

@@ -21,9 +21,7 @@ const NOTE = 'Inferred from observed traffic; not an official contract. A field 
 
 /** The path without `api` and version prefixes, to name and group things after the resource. */
 function resourceSegments(template: string): string[] {
-  return template
-    .split('/')
-    .filter((segment) => segment && !segment.startsWith('{') && !/^(api|rest|v\d+(\.\d+)?)$/i.test(segment));
+  return template.split('/').filter((segment) => segment && !segment.startsWith('{') && !/^(api|rest|v\d+(\.\d+)?)$/i.test(segment));
 }
 
 function tagOf(endpoint: EndpointStats): string {
@@ -31,7 +29,13 @@ function tagOf(endpoint: EndpointStats): string {
 }
 
 function operationId(endpoint: EndpointStats): string {
-  const named = endpoint.operation ? pascal(endpoint.operation) : endpoint.template.split('/').filter(Boolean).map((s) => pascal(s.replace(/[{}]/g, ''))).join('');
+  const named = endpoint.operation
+    ? pascal(endpoint.operation)
+    : endpoint.template
+        .split('/')
+        .filter(Boolean)
+        .map((s) => pascal(s.replace(/[{}]/g, '')))
+        .join('');
   return `${endpoint.method.toLowerCase()}${named || 'Root'}`;
 }
 
@@ -45,7 +49,8 @@ function byTag(endpoints: EndpointStats[]): Map<string, EndpointStats[]> {
   return groups;
 }
 
-const dominant = (counts: Record<string, number>, fallback = '') => Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? fallback;
+const dominant = (counts: Record<string, number>, fallback = '') =>
+  Object.entries(counts).toSorted((a, b) => b[1] - a[1])[0]?.[0] ?? fallback;
 
 // --------------------------------------------------------------------------------- components
 
@@ -64,7 +69,10 @@ const isObjectSchema = (schema: JsonSchema) => {
  * Moves structures that are objects (or lists of objects) out of the operations into
  * `components.schemas`, named after the resource; equal structures share one component.
  */
-function extractComponents(model: DiscoveryModel): { components: Components; ref: (endpoint: EndpointStats, status: string) => JsonSchema | null } {
+function extractComponents(model: DiscoveryModel): {
+  components: Components;
+  ref: (endpoint: EndpointStats, status: string) => JsonSchema | null;
+} {
   const components: Components = { schemas: {}, usedBy: {} };
   const names = new Map<string, string>(); // fingerprint → component name
   const taken = new Set<string>();
@@ -73,7 +81,9 @@ function extractComponents(model: DiscoveryModel): { components: Components; ref
     const fingerprint = schemaFingerprint(schema);
     const known = names.get(fingerprint);
     if (known) return known;
-    const resource = endpoint.operation ? pascal(endpoint.operation) : pascal(singular(resourceSegments(endpoint.template).at(-1) ?? 'Root'));
+    const resource = endpoint.operation
+      ? pascal(endpoint.operation)
+      : pascal(singular(resourceSegments(endpoint.template).at(-1) ?? 'Root'));
     const suffix = status === 'request' ? 'Request' : /^[45]/.test(status) ? 'Error' : '';
     const base = `${resource || 'Root'}${suffix}`;
     let name = base;
@@ -109,16 +119,24 @@ function extractComponents(model: DiscoveryModel): { components: Components; ref
   };
   // every structure is named up front, in a stable order, so all exports agree on the names
   for (const endpoint of model.endpoints().toSorted((a, b) => a.template.localeCompare(b.template) || a.method.localeCompare(b.method))) {
-    for (const status of ['request', ...Object.keys(endpoint.responses).sort()]) ref(endpoint, status);
+    for (const status of ['request', ...Object.keys(endpoint.responses).toSorted()]) ref(endpoint, status);
   }
   return { components, ref };
 }
 
 // -------------------------------------------------------------------------------------- OpenAPI
 
-const pathSchemaOf = (kind: string): JsonSchema => (kind === 'integer' ? { type: 'integer' } : kind === 'uuid' ? { type: 'string', format: 'uuid' } : kind === 'date' ? { type: 'string', format: 'date' } : { type: 'string' });
+const pathSchemaOf = (kind: string): JsonSchema =>
+  kind === 'integer'
+    ? { type: 'integer' }
+    : kind === 'uuid'
+      ? { type: 'string', format: 'uuid' }
+      : kind === 'date'
+        ? { type: 'string', format: 'date' }
+        : { type: 'string' };
 
-const STANDARD_HEADERS = /^(accept|accept-.*|authorization|cache-control|connection|content-.*|cookie|dnt|host|origin|pragma|priority|referer|sec-.*|user-agent|upgrade-insecure-requests|if-.*|x-requested-with|te)$/;
+const STANDARD_HEADERS =
+  /^(accept|accept-.*|authorization|cache-control|connection|content-.*|cookie|dnt|host|origin|pragma|priority|referer|sec-.*|user-agent|upgrade-insecure-requests|if-.*|x-requested-with|te)$/;
 
 function jsonExample(text: string | undefined): unknown {
   if (!text) return undefined;
@@ -133,7 +151,7 @@ export function buildOpenApi(model: DiscoveryModel, options: { examples?: boolea
   const { name } = model.state;
   const endpoints = model.endpoints();
   const { components, ref } = extractComponents(model);
-  const origins = [...new Set(endpoints.map((endpoint) => endpoint.origin))].sort();
+  const origins = [...new Set(endpoints.map((endpoint) => endpoint.origin))].toSorted();
   const security: Record<string, unknown> = {};
   const paths: Record<string, Record<string, unknown>> = {};
   const withExamples = options.examples ?? true;
@@ -144,7 +162,13 @@ export function buildOpenApi(model: DiscoveryModel, options: { examples?: boolea
     const method = endpoint.method.toLowerCase();
     if (item[method]) continue; // the same method and path on another origin
     const parameters: Record<string, unknown>[] = [
-      ...endpoint.params.map((param) => ({ name: param.name, in: 'path', required: true, schema: pathSchemaOf(param.kind), example: param.example })),
+      ...endpoint.params.map((param) => ({
+        name: param.name,
+        in: 'path',
+        required: true,
+        schema: pathSchemaOf(param.kind),
+        example: param.example,
+      })),
       ...Object.entries(endpoint.query).map(([queryName, param]) => ({
         name: queryName,
         in: 'query',
@@ -154,7 +178,12 @@ export function buildOpenApi(model: DiscoveryModel, options: { examples?: boolea
       })),
       ...Object.keys(endpoint.requestHeaders)
         .filter((header) => !STANDARD_HEADERS.test(header) && header.startsWith('x-'))
-        .map((header) => ({ name: header, in: 'header', required: endpoint.requestHeaders[header] === endpoint.calls, schema: { type: 'string' } })),
+        .map((header) => ({
+          name: header,
+          in: 'header',
+          required: endpoint.requestHeaders[header] === endpoint.calls,
+          schema: { type: 'string' },
+        })),
     ];
 
     const operation: Record<string, unknown> = {
@@ -172,17 +201,34 @@ export function buildOpenApi(model: DiscoveryModel, options: { examples?: boolea
     const requestType = dominant(endpoint.requestTypes);
     if (requestSchema || Object.keys(endpoint.formFields).length) {
       const media = requestSchema
-        ? { schema: requestSchema, ...(withExamples && jsonExample(endpoint.requestExample) !== undefined ? { example: jsonExample(endpoint.requestExample) } : {}) }
-        : { schema: { type: 'object', properties: Object.fromEntries(Object.keys(endpoint.formFields).map((field) => [field, { type: 'string' }])) } };
-      operation.requestBody = { content: { [requestType || (requestSchema ? 'application/json' : 'application/x-www-form-urlencoded')]: media } };
+        ? {
+            schema: requestSchema,
+            ...(withExamples && jsonExample(endpoint.requestExample) !== undefined
+              ? { example: jsonExample(endpoint.requestExample) }
+              : {}),
+          }
+        : {
+            schema: {
+              type: 'object',
+              properties: Object.fromEntries(Object.keys(endpoint.formFields).map((field) => [field, { type: 'string' }])),
+            },
+          };
+      operation.requestBody = {
+        content: { [requestType || (requestSchema ? 'application/json' : 'application/x-www-form-urlencoded')]: media },
+      };
     }
 
     // responses: every status seen, with a schema where a body was observed
     const responses: Record<string, unknown> = {};
     const responseType = dominant(endpoint.responseTypes, 'application/json');
-    for (const status of Object.keys(endpoint.statuses).sort()) {
+    for (const status of Object.keys(endpoint.statuses).toSorted()) {
       const key = status === 'failed' ? 'default' : status;
-      const bodyKey = status in endpoint.responses ? status : /^\dXX$/.test(status[0] + 'XX') && `${status[0]}XX` in endpoint.responses ? `${status[0]}XX` : null;
+      const bodyKey =
+        status in endpoint.responses
+          ? status
+          : /^\dXX$/.test(status[0] + 'XX') && `${status[0]}XX` in endpoint.responses
+            ? `${status[0]}XX`
+            : null;
       const schema = bodyKey ? ref(endpoint, bodyKey) : null;
       const example = bodyKey && withExamples ? jsonExample(endpoint.responseExamples[bodyKey]?.[0]) : undefined;
       responses[key] = {
@@ -228,7 +274,8 @@ const YAML_RESERVED = /^(true|false|null|yes|no|on|off|~|[-+]?\d[\d_.eE+-]*)$/i;
 
 function yamlScalar(value: unknown): string {
   if (value === null || value === undefined) return 'null';
-  if (typeof value === 'string') return YAML_PLAIN.test(value) && !YAML_RESERVED.test(value) && !value.endsWith(' ') ? value : JSON.stringify(value);
+  if (typeof value === 'string')
+    return YAML_PLAIN.test(value) && !YAML_RESERVED.test(value) && !value.endsWith(' ') ? value : JSON.stringify(value);
   return String(value);
 }
 
@@ -271,7 +318,8 @@ const tsKey = (key: string) => (/^[A-Za-z_$][\w$]*$/.test(key) ? key : JSON.stri
 export function schemaToTs(schema: JsonSchema, indent = 0): string {
   const pad = '  '.repeat(indent + 1);
   if (typeof schema.$ref === 'string') return schema.$ref.split('/').pop()!;
-  if (Array.isArray(schema.anyOf)) return [...new Set((schema.anyOf as JsonSchema[]).map((option) => schemaToTs(option, indent)))].join(' | ');
+  if (Array.isArray(schema.anyOf))
+    return [...new Set((schema.anyOf as JsonSchema[]).map((option) => schemaToTs(option, indent)))].join(' | ');
   const declared = schema.type;
   const kinds = declared === undefined ? [] : Array.isArray(declared) ? (declared as string[]) : [declared as string];
   if (!kinds.length) return 'unknown';
@@ -292,9 +340,14 @@ export function schemaToTs(schema: JsonSchema, indent = 0): string {
       }
       case 'object': {
         const properties = schema.properties as Record<string, JsonSchema> | undefined;
-        if (!properties) return schema.additionalProperties ? `Record<string, ${schemaToTs(schema.additionalProperties as JsonSchema, indent)}>` : 'Record<string, unknown>';
+        if (!properties)
+          return schema.additionalProperties
+            ? `Record<string, ${schemaToTs(schema.additionalProperties as JsonSchema, indent)}>`
+            : 'Record<string, unknown>';
         const required = new Set((schema.required as string[] | undefined) ?? []);
-        const lines = Object.entries(properties).map(([key, child]) => `${pad}${tsKey(key)}${required.has(key) ? '' : '?'}: ${schemaToTs(child, indent + 1)};`);
+        const lines = Object.entries(properties).map(
+          ([key, child]) => `${pad}${tsKey(key)}${required.has(key) ? '' : '?'}: ${schemaToTs(child, indent + 1)};`,
+        );
         return lines.length ? `{\n${lines.join('\n')}\n${'  '.repeat(indent)}}` : 'Record<string, never>';
       }
       default:
@@ -307,7 +360,7 @@ export function schemaToTs(schema: JsonSchema, indent = 0): string {
 export function buildTypeScript(model: DiscoveryModel): string {
   const { components } = extractComponents(model);
   const out = [`// Generated by BetterDevTools from "${model.state.name}". ${NOTE}`, ''];
-  for (const [name, schema] of Object.entries(components.schemas).sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [name, schema] of Object.entries(components.schemas).toSorted(([a], [b]) => a.localeCompare(b))) {
     const body = schemaToTs(schema);
     out.push(body.startsWith('{') ? `export interface ${name} ${body}` : `export type ${name} = ${body};`, '');
   }
@@ -324,7 +377,9 @@ export interface DependencyGraph {
 const shortLabel = (endpoint: EndpointStats) => `${endpoint.method} ${endpoint.operation ?? endpoint.template}`;
 
 export function buildDependencyGraph(model: DiscoveryModel, kinds: ('data' | 'temporal')[] = ['data', 'temporal']): DependencyGraph {
-  const edges = Object.values(model.state.edges).filter((edge) => kinds.includes(edge.kind) && model.state.endpoints[edge.from] && model.state.endpoints[edge.to]);
+  const edges = Object.values(model.state.edges).filter(
+    (edge) => kinds.includes(edge.kind) && model.state.endpoints[edge.from] && model.state.endpoints[edge.to],
+  );
   const used = new Set(edges.flatMap((edge) => [edge.from, edge.to]));
   return {
     nodes: [...used].map((id) => ({ id, label: shortLabel(model.state.endpoints[id]!), calls: model.state.endpoints[id]!.calls })),
@@ -338,23 +393,45 @@ export function buildMarkdown(model: DiscoveryModel): string {
   const { components } = extractComponents(model);
   const endpoints = model.endpoints();
   const graph = buildDependencyGraph(model, ['data']);
-  const out: string[] = [`# ${model.state.name}`, '', `> ${NOTE}`, '', `${endpoints.length} endpoints, ${Object.keys(components.schemas).length} shared schemas, ${new Set(endpoints.map((e) => e.origin)).size} origin(s), ${model.state.seen} requests observed.`, ''];
+  const out: string[] = [
+    `# ${model.state.name}`,
+    '',
+    `> ${NOTE}`,
+    '',
+    `${endpoints.length} endpoints, ${Object.keys(components.schemas).length} shared schemas, ${new Set(endpoints.map((e) => e.origin)).size} origin(s), ${model.state.seen} requests observed.`,
+    '',
+  ];
   out.push('| Method | Endpoint | Status | Calls |', '| --- | --- | --- | ---: |');
   for (const endpoint of endpoints.toSorted((a, b) => a.template.localeCompare(b.template))) {
-    out.push(`| ${endpoint.method} | \`${endpoint.operation ?? endpoint.template}\` | ${Object.keys(endpoint.statuses).join(', ')} | ${endpoint.calls} |`);
+    out.push(
+      `| ${endpoint.method} | \`${endpoint.operation ?? endpoint.template}\` | ${Object.keys(endpoint.statuses).join(', ')} | ${endpoint.calls} |`,
+    );
   }
   for (const [tag, group] of byTag(endpoints)) {
     out.push('', `## ${tag}`);
     for (const endpoint of group) {
-      out.push('', `### ${endpoint.method} ${endpoint.operation ?? endpoint.template}`, '', `Origin: ${endpoint.origin} · ${endpoint.calls} call(s) · avg ${Math.round(endpoint.timing.n ? endpoint.timing.sum / endpoint.timing.n : 0)} ms · p95 ${Math.round(percentile95(endpoint.timing))} ms`);
+      out.push(
+        '',
+        `### ${endpoint.method} ${endpoint.operation ?? endpoint.template}`,
+        '',
+        `Origin: ${endpoint.origin} · ${endpoint.calls} call(s) · avg ${Math.round(endpoint.timing.n ? endpoint.timing.sum / endpoint.timing.n : 0)} ms · p95 ${Math.round(percentile95(endpoint.timing))} ms`,
+      );
       if (endpoint.params.length) out.push('', 'Path parameters: ' + endpoint.params.map((p) => `\`${p.name}\` (${p.kind})`).join(', '));
-      if (Object.keys(endpoint.query).length) out.push('', 'Query: ' + Object.entries(endpoint.query).map(([n, p]) => `\`${n}\`${p.count === endpoint.calls ? '' : ' (optional)'}`).join(', '));
+      if (Object.keys(endpoint.query).length)
+        out.push(
+          '',
+          'Query: ' +
+            Object.entries(endpoint.query)
+              .map(([n, p]) => `\`${n}\`${p.count === endpoint.calls ? '' : ' (optional)'}`)
+              .join(', '),
+        );
       if (Object.keys(endpoint.auth).length) out.push('', `Authentication seen: ${Object.keys(endpoint.auth).join(', ')}`);
       const request = model.schemaOf(endpoint, 'request');
       if (request) out.push('', '**Request body**', '', '```ts', schemaToTs(request), '```');
-      for (const status of Object.keys(endpoint.responses).sort()) {
+      for (const status of Object.keys(endpoint.responses).toSorted()) {
         const schema = model.schemaOf(endpoint, status);
-        if (schema) out.push('', `**Response ${status}** (${endpoint.statuses[status] ?? '?'} observed)`, '', '```ts', schemaToTs(schema), '```');
+        if (schema)
+          out.push('', `**Response ${status}** (${endpoint.statuses[status] ?? '?'} observed)`, '', '```ts', schemaToTs(schema), '```');
         const example = endpoint.responseExamples[status]?.[0];
         if (example) out.push('', '<details><summary>Example</summary>', '', '```json', example, '```', '', '</details>');
       }
@@ -364,13 +441,19 @@ export function buildMarkdown(model: DiscoveryModel): string {
     out.push('', '## Dependencies', '', '```mermaid', 'graph LR');
     const id = new Map(graph.nodes.map((node, index) => [node.id, `n${index}`]));
     for (const node of graph.nodes) out.push(`  ${id.get(node.id)}["${node.label.replace(/"/g, "'")}"]`);
-    for (const edge of graph.edges) out.push(`  ${id.get(edge.from)} -->|${(edge.evidence[0]?.target ?? 'data').replace(/[|"]/g, '')}| ${id.get(edge.to)}`);
+    for (const edge of graph.edges)
+      out.push(`  ${id.get(edge.from)} -->|${(edge.evidence[0]?.target ?? 'data').replace(/[|"]/g, '')}| ${id.get(edge.to)}`);
     out.push('```');
   }
   if (model.state.scenarios.length) {
     out.push('', '## Scenarios');
     for (const scenario of model.state.scenarios) {
-      out.push('', `### ${scenario.name}`, '', ...scenario.endpoints.map((key) => `- ${model.state.endpoints[key] ? shortLabel(model.state.endpoints[key]!) : key}`));
+      out.push(
+        '',
+        `### ${scenario.name}`,
+        '',
+        ...scenario.endpoints.map((key) => `- ${model.state.endpoints[key] ? shortLabel(model.state.endpoints[key]!) : key}`),
+      );
     }
   }
   return out.join('\n') + '\n';
@@ -400,12 +483,19 @@ export function buildReportHtml(model: DiscoveryModel): string {
   const rows = endpoints
     .map((endpoint) => {
       const details = [
-        ...Object.keys(endpoint.responses).sort().flatMap((status) => {
-          const schema = model.schemaOf(endpoint, status);
-          return schema ? [`<h4>Response ${escapeHtml(status)}</h4><pre>${escapeHtml(schemaToTs(schema))}</pre>`] : [];
-        }),
-        ...(model.schemaOf(endpoint, 'request') ? [`<h4>Request body</h4><pre>${escapeHtml(schemaToTs(model.schemaOf(endpoint, 'request')!))}</pre>`] : []),
-        ...Object.values(endpoint.responseExamples).flat().slice(0, 1).map((example) => `<h4>Example</h4><pre>${escapeHtml(example)}</pre>`),
+        ...Object.keys(endpoint.responses)
+          .toSorted()
+          .flatMap((status) => {
+            const schema = model.schemaOf(endpoint, status);
+            return schema ? [`<h4>Response ${escapeHtml(status)}</h4><pre>${escapeHtml(schemaToTs(schema))}</pre>`] : [];
+          }),
+        ...(model.schemaOf(endpoint, 'request')
+          ? [`<h4>Request body</h4><pre>${escapeHtml(schemaToTs(model.schemaOf(endpoint, 'request')!))}</pre>`]
+          : []),
+        ...Object.values(endpoint.responseExamples)
+          .flat()
+          .slice(0, 1)
+          .map((example) => `<h4>Example</h4><pre>${escapeHtml(example)}</pre>`),
       ].join('');
       return `<details><summary><b class="m ${endpoint.method}">${endpoint.method}</b> <code>${escapeHtml(endpoint.operation ?? endpoint.template)}</code> <span>${Object.keys(endpoint.statuses).join(' ')} · ${endpoint.calls} call(s)</span></summary>${details || '<p>No body observed.</p>'}</details>`;
     })
@@ -422,9 +512,21 @@ ${graphSvg(model) ? `<h2>Dependencies</h2><div style="overflow:auto">${graphSvg(
 
 // ---------------------------------------------------------------------------------- the package
 
-export type DiscoveryExportFormat = 'package' | 'openapi-yaml' | 'openapi-json' | 'schemas' | 'typescript' | 'markdown' | 'report' | 'graph';
+export type DiscoveryExportFormat =
+  | 'package'
+  | 'openapi-yaml'
+  | 'openapi-json'
+  | 'schemas'
+  | 'typescript'
+  | 'markdown'
+  | 'report'
+  | 'graph';
 
-const slug = (text: string) => text.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'discovery';
+const slug = (text: string) =>
+  text
+    .replace(/[^\w.-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'discovery';
 
 /** The files of one export format (the `package` format is the whole folder). */
 export function buildExportFiles(model: DiscoveryModel, format: DiscoveryExportFormat): ZipFile[] {
@@ -433,7 +535,16 @@ export function buildExportFiles(model: DiscoveryModel, format: DiscoveryExportF
     const { components } = extractComponents(model);
     return Object.entries(components.schemas).map(([name, schema]) => ({
       path: `schemas/${name}.schema.json`,
-      text: JSON.stringify({ $schema: 'https://json-schema.org/draft/2020-12/schema', title: name, description: NOTE, ...canonicalSchemaKeepingInference(schema) }, null, 2),
+      text: JSON.stringify(
+        {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          title: name,
+          description: NOTE,
+          ...canonicalSchemaKeepingInference(schema),
+        },
+        null,
+        2,
+      ),
     }));
   };
   const graph = () => ({ path: 'dependencies/graph.json', text: JSON.stringify(buildDependencyGraph(model), null, 2) });
@@ -503,7 +614,11 @@ export function buildExport(model: DiscoveryModel, format: DiscoveryExportFormat
     const mime = file.path.endsWith('.json') ? 'application/json' : file.path.endsWith('.html') ? 'text/html' : 'text/plain';
     return { name: `${base}.${file.path}`, mime, bytes: new TextEncoder().encode(file.text) };
   }
-  return { name: `${base}-discovery-export.zip`, mime: 'application/zip', bytes: createZip(files.map((file) => ({ ...file, path: `discovery-export/${file.path}` }))) };
+  return {
+    name: `${base}-discovery-export.zip`,
+    mime: 'application/zip',
+    bytes: createZip(files.map((file) => ({ ...file, path: `discovery-export/${file.path}` }))),
+  };
 }
 
 /** The shared structures (components) of a session, with the endpoints that use each. */
@@ -511,7 +626,7 @@ export function listComponents(model: DiscoveryModel): { name: string; schema: J
   const { components } = extractComponents(model);
   return Object.entries(components.schemas)
     .map(([name, schema]) => ({ name, schema, usedBy: components.usedBy[name] ?? [] }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
 export { shortLabel as endpointLabel };

@@ -186,7 +186,10 @@ function graphqlOperation(text: string | undefined): { name: string; variables: 
   if (!parsed.ok || typeof parsed.value !== 'object' || parsed.value === null || Array.isArray(parsed.value)) return null;
   const body = parsed.value as Record<string, unknown>;
   if (typeof body.query !== 'string') return null;
-  const named = typeof body.operationName === 'string' && body.operationName ? body.operationName : /(?:query|mutation|subscription)\s+([A-Za-z_]\w*)/.exec(body.query)?.[1];
+  const named =
+    typeof body.operationName === 'string' && body.operationName
+      ? body.operationName
+      : /(?:query|mutation|subscription)\s+([A-Za-z_]\w*)/.exec(body.query)?.[1];
   const field = /\{\s*([A-Za-z_]\w*)/.exec(body.query)?.[1];
   return { name: named ?? (field ? `anonymous:${field}` : 'anonymous'), variables: body.variables, query: body.query };
 }
@@ -197,7 +200,15 @@ function bump(record: Record<string, number>, key: string, by = 1) {
   record[key] = (record[key] ?? 0) + by;
 }
 
-function newEndpoint(key: string, method: string, origin: string, template: string, params: PathParam[], operation: string | undefined, now: number): EndpointStats {
+function newEndpoint(
+  key: string,
+  method: string,
+  origin: string,
+  template: string,
+  params: PathParam[],
+  operation: string | undefined,
+  now: number,
+): EndpointStats {
   return {
     key,
     method,
@@ -242,12 +253,22 @@ function followable(value: unknown): value is string | number {
   return /\d/.test(value) || value.length >= 16;
 }
 
-function walkLeaves(value: unknown, visit: (leaf: string | number, path: string) => void, path = '$', budget = { left: 400 }, depth = 0): void {
+/** In a URL a bare number is an id too (a response gives it as a number, the path as text). */
+const idLike = (text: string) => /^\d{3,16}$/.test(text) || followable(text);
+
+function walkLeaves(
+  value: unknown,
+  visit: (leaf: string | number, path: string) => void,
+  path = '$',
+  budget = { left: 400 },
+  depth = 0,
+): void {
   if (budget.left <= 0 || depth > 8) return;
   if (Array.isArray(value)) {
     for (let index = 0; index < Math.min(value.length, 20); index++) walkLeaves(value[index], visit, `${path}[]`, budget, depth + 1);
   } else if (typeof value === 'object' && value !== null) {
-    for (const [key, child] of Object.entries(value)) walkLeaves(child, visit, /^[A-Za-z_$][\w$]*$/.test(key) ? `${path}.${key}` : `${path}[${JSON.stringify(key)}]`, budget, depth + 1);
+    for (const [key, child] of Object.entries(value))
+      walkLeaves(child, visit, /^[A-Za-z_$][\w$]*$/.test(key) ? `${path}.${key}` : `${path}[${JSON.stringify(key)}]`, budget, depth + 1);
   } else if (followable(value)) {
     budget.left--;
     visit(value, path);
@@ -278,7 +299,8 @@ export class DiscoveryModel {
   static fromJSON(raw: unknown): DiscoveryModel | null {
     if (typeof raw !== 'object' || raw === null) return null;
     const state = raw as Partial<DiscoveryState>;
-    if (state.version !== DISCOVERY_VERSION || typeof state.id !== 'string' || typeof state.endpoints !== 'object' || !state.endpoints) return null;
+    if (state.version !== DISCOVERY_VERSION || typeof state.id !== 'string' || typeof state.endpoints !== 'object' || !state.endpoints)
+      return null;
     return new DiscoveryModel(state as DiscoveryState);
   }
 
@@ -324,7 +346,15 @@ export class DiscoveryModel {
         state.ignored++;
         return false;
       }
-      endpoint = state.endpoints[key] = newEndpoint(key, method, url.origin, normalized.template, normalized.params, gql?.name, call.started);
+      endpoint = state.endpoints[key] = newEndpoint(
+        key,
+        method,
+        url.origin,
+        normalized.template,
+        normalized.params,
+        gql?.name,
+        call.started,
+      );
       if (state.frozen) state.newSinceFreeze.push(key);
     }
     endpoint.calls++;
@@ -371,7 +401,8 @@ export class DiscoveryModel {
     if (requestText) {
       if (gql) {
         requestValue = gql.variables;
-        if (gql.variables !== undefined && gql.variables !== null) observeValue((endpoint.requestSchema ??= emptySchemaAcc()), gql.variables);
+        if (gql.variables !== undefined && gql.variables !== null)
+          observeValue((endpoint.requestSchema ??= emptySchemaAcc()), gql.variables);
         endpoint.requestExample ??= exampleText({ query: gql.query.slice(0, 300), variables: gql.variables });
       } else if (/x-www-form-urlencoded/i.test(request.postData?.mimeType ?? '')) {
         for (const [name] of new URLSearchParams(requestText)) bump(endpoint.formFields, name);
@@ -387,7 +418,8 @@ export class DiscoveryModel {
 
     // response body
     let responseValue: unknown;
-    const responseKey = Object.keys(endpoint.responses).length >= MAX_STATUS_KEYS && !(status in endpoint.responses) ? `${status[0]}XX` : status;
+    const responseKey =
+      Object.keys(endpoint.responses).length >= MAX_STATUS_KEYS && !(status in endpoint.responses) ? `${status[0]}XX` : status;
     if (body.state === 'unavailable') endpoint.incomplete.unavailable++;
     else if (body.state === 'discarded') endpoint.incomplete.discarded++;
     else if (body.state === 'truncated') endpoint.incomplete.truncated++;
@@ -469,16 +501,34 @@ export class DiscoveryModel {
     else if (violations.length < MAX_VIOLATIONS) violations.push({ status, path, message, count: 1 });
   }
 
-  #dependencies(call: Captured, key: string, url: URL, headers: { name: string; value: string }[], requestValue: unknown, responseValue: unknown) {
+  #dependencies(
+    call: Captured,
+    key: string,
+    url: URL,
+    headers: { name: string; value: string }[],
+    requestValue: unknown,
+    responseValue: unknown,
+  ) {
     const edge = (from: string, to: string, kind: EdgeKind, evidence?: { source: string; target: string }) => {
       const id = `${kind}|${from}|${to}`;
       const found = (this.state.edges[id] ??= { from, to, kind, count: 0, evidence: [] });
       found.count++;
-      if (evidence && found.evidence.length < 4 && !found.evidence.some((e) => e.source === evidence.source && e.target === evidence.target)) found.evidence.push(evidence);
+      if (
+        evidence &&
+        found.evidence.length < 4 &&
+        !found.evidence.some((e) => e.source === evidence.source && e.target === evidence.target)
+      )
+        found.evidence.push(evidence);
     };
 
     // temporal: this call began soon after the previous one (same scenario)
-    if (this.#last && this.#last.key !== key && this.#last.scenario === this.#scenario && call.started - this.#last.started >= 0 && call.started - this.#last.started <= TEMPORAL_WINDOW_MS) {
+    if (
+      this.#last &&
+      this.#last.key !== key &&
+      this.#last.scenario === this.#scenario &&
+      call.started - this.#last.started >= 0 &&
+      call.started - this.#last.started <= TEMPORAL_WINDOW_MS
+    ) {
       edge(this.#last.key, key, 'temporal');
     }
     this.#last = { key, started: call.started, scenario: this.#scenario };
@@ -488,8 +538,6 @@ export class DiscoveryModel {
       const source = this.#flow.get(String(value));
       if (source && source.key !== key) edge(source.key, key, 'data', { source: source.path, target });
     };
-    // in a URL a bare number is an id too (a response gives it as a number, the path as text)
-    const idLike = (text: string) => /^\d{3,16}$/.test(text) || followable(text);
     url.pathname.split('/').forEach((segment) => segment && idLike(segment) && used(segment, 'path'));
     for (const [name, value] of url.searchParams) if (idLike(value)) used(value, `query ${name}`);
     for (const header of headers) {
@@ -564,10 +612,13 @@ export class DiscoveryModel {
     segments[position] = `{${name}}`;
     const template = `/${segments.join('/')}`;
     const key = `${first.method} ${first.origin}${template}${first.operation ? `#${first.operation}` : ''}`;
-    const target = this.state.endpoints[key] ?? newEndpoint(key, first.method, first.origin, template, [], first.operation, first.firstSeen);
+    const target =
+      this.state.endpoints[key] ?? newEndpoint(key, first.method, first.origin, template, [], first.operation, first.firstSeen);
     // path parameters keep their order along the path
     const parameterAt = (index: number) => ({ name, kind: 'slug' as const, example: examples[index] ?? '' });
-    target.params = [...target.params, parameterAt(0)].sort((a, b) => template.indexOf(`{${a.name}}`) - template.indexOf(`{${b.name}}`));
+    target.params = [...target.params, parameterAt(0)].toSorted(
+      (a, b) => template.indexOf(`{${a.name}}`) - template.indexOf(`{${b.name}}`),
+    );
     for (const member of members) {
       if (member.key === key) continue;
       mergeEndpoint(target, member);
@@ -589,7 +640,9 @@ export class DiscoveryModel {
       const existing = edges[id];
       if (existing) {
         existing.count += edge.count;
-        for (const evidence of edge.evidence) if (existing.evidence.length < 4 && !existing.evidence.some((e) => e.source === evidence.source && e.target === evidence.target)) existing.evidence.push(evidence);
+        for (const evidence of edge.evidence)
+          if (existing.evidence.length < 4 && !existing.evidence.some((e) => e.source === evidence.source && e.target === evidence.target))
+            existing.evidence.push(evidence);
       } else edges[id] = { ...edge, from, to: target };
     }
     this.state.edges = edges;
@@ -652,8 +705,8 @@ export class DiscoveryModel {
 /** Fingerprint of an endpoint's most common success response, for the collapse comparison. */
 function successShape(endpoint: EndpointStats): string | null {
   const status = Object.keys(endpoint.responses)
-    .filter((code) => /^2/.test(code))
-    .sort((a, b) => (endpoint.responses[b]?.n ?? 0) - (endpoint.responses[a]?.n ?? 0))[0];
+    .filter((code) => code.startsWith('2'))
+    .toSorted((a, b) => (endpoint.responses[b]?.n ?? 0) - (endpoint.responses[a]?.n ?? 0))[0];
   const acc = status ? endpoint.responses[status] : undefined;
   return acc && acc.n > 0 ? schemaFingerprint(inferSchema(acc)) : null;
 }
@@ -675,16 +728,30 @@ export function mergeEndpoint(into: EndpointStats, from: EndpointStats): void {
   into.calls += from.calls;
   into.firstSeen = Math.min(into.firstSeen, from.firstSeen);
   into.lastSeen = Math.max(into.lastSeen, from.lastSeen);
-  for (const field of ['statuses', 'requestHeaders', 'responseHeaders', 'requestTypes', 'responseTypes', 'auth', 'formFields', 'scenarios'] as const) sumInto(into[field], from[field]);
-  for (const example of from.urlExamples) if (into.urlExamples.length < MAX_EXAMPLES && !into.urlExamples.includes(example)) into.urlExamples.push(example);
+  for (const field of [
+    'statuses',
+    'requestHeaders',
+    'responseHeaders',
+    'requestTypes',
+    'responseTypes',
+    'auth',
+    'formFields',
+    'scenarios',
+  ] as const)
+    sumInto(into[field], from[field]);
+  for (const example of from.urlExamples)
+    if (into.urlExamples.length < MAX_EXAMPLES && !into.urlExamples.includes(example)) into.urlExamples.push(example);
   for (const [name, param] of Object.entries(from.query)) {
     const mine = (into.query[name] ??= { count: 0, types: {}, examples: [] });
     mine.count += param.count;
     sumInto(mine.types, param.types);
-    for (const example of param.examples) if (mine.examples.length < MAX_EXAMPLES && !mine.examples.includes(example)) mine.examples.push(example);
+    for (const example of param.examples)
+      if (mine.examples.length < MAX_EXAMPLES && !mine.examples.includes(example)) mine.examples.push(example);
   }
-  if (from.requestSchema) into.requestSchema = into.requestSchema ? mergeSchemaAcc(into.requestSchema, from.requestSchema) : structuredClone(from.requestSchema);
-  for (const [status, acc] of Object.entries(from.responses)) into.responses[status] = into.responses[status] ? mergeSchemaAcc(into.responses[status], acc) : structuredClone(acc);
+  if (from.requestSchema)
+    into.requestSchema = into.requestSchema ? mergeSchemaAcc(into.requestSchema, from.requestSchema) : structuredClone(from.requestSchema);
+  for (const [status, acc] of Object.entries(from.responses))
+    into.responses[status] = into.responses[status] ? mergeSchemaAcc(into.responses[status], acc) : structuredClone(acc);
   into.requestExample ??= from.requestExample;
   for (const [status, list] of Object.entries(from.responseExamples)) {
     const mine = (into.responseExamples[status] ??= []);
@@ -699,7 +766,8 @@ export function mergeEndpoint(into: EndpointStats, from: EndpointStats): void {
   sumInto(into.incomplete as unknown as Record<string, number>, from.incomplete as unknown as Record<string, number>);
   into.validation.checked += from.validation.checked;
   into.validation.failed += from.validation.failed;
-  for (const violation of from.validation.violations) if (into.validation.violations.length < MAX_VIOLATIONS) into.validation.violations.push(violation);
+  for (const violation of from.validation.violations)
+    if (into.validation.violations.length < MAX_VIOLATIONS) into.validation.violations.push(violation);
 }
 
 export function percentile95(timing: Timing): number {

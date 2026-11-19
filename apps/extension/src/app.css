@@ -131,7 +131,7 @@ html {
   --color-bg: light-dark(#ffffff, #0d1117);
   --color-bg-2: light-dark(#f6f8fa, #161b22);
   --color-bg-3: light-dark(#eef1f4, #21262d);
-  --color-line: light-dark(#d1d9e0, #30363d);
+  --color-line: light-dark(#c9d1d9, #30363d);
 
   /* Typography */
 
@@ -141,7 +141,7 @@ html {
   /* Primary */
 
   --color-accent: light-dark(#0969da, #4493f8);
-  --color-on-accent: light-dark(#ffffff, #ffffff);
+  --color-on-accent: light-dark(#ffffff, #0d1117);
   --color-sel: light-dark(#ddf4ff, #1c3448);
 
   /* Semantic */
@@ -160,7 +160,7 @@ html {
   --color-syn-kw: light-dark(#8250df, #d2a8ff);
   --color-syn-str: light-dark(#0a7b45, #a5d6a7);
   --color-syn-num: light-dark(#0550ae, #79c0ff);
-  --color-syn-com: light-dark(#6e7781, #8b949e);
+  --color-syn-com: light-dark(#68717b, #8b949e);
   --color-syn-prop: light-dark(#0550ae, #79c0ff);
   --color-syn-tag: light-dark(#cf222e, #ff7b72);
   --color-syn-attr: light-dark(#953800, #d2a8ff);
@@ -209,7 +209,7 @@ html {
 
   /* DELETE */
 
-  --color-m-delete: light-dark(#cf222e, #f85149);
+  --color-m-delete: light-dark(#cf222e, #ff6e66);
   --color-m-delete-bg: light-dark(#ffebe9, #3d1d20);
 
   /* OPTIONS */
@@ -259,12 +259,12 @@ html {
 
   /* HTTP 5XX */
 
-  --color-s-5xx: light-dark(#cf222e, #f85149);
+  --color-s-5xx: light-dark(#cf222e, #ff6e66);
   --color-s-5xx-bg: light-dark(#ffebe9, #3d1d20);
 
   /* ERROR */
 
-  --color-s-error: light-dark(#cf222e, #f85149);
+  --color-s-error: light-dark(#cf222e, #ff6e66);
   --color-s-error-bg: light-dark(#ffebe9, #3d1d20);
 
   /* CANCELLED */

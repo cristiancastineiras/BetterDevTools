@@ -133,10 +133,10 @@ export default function CodeViewer(props: {
   const shownLines = createMemo(() => indexLines(shownText()));
 
   const summary = createMemo(() => {
-    const jsonShape = json();
+    const shape = json();
     return [
       t(`viewer.formats.${format()}`),
-      jsonShape ? t(jsonShape.kind === 'array' ? 'viewer.jsonArray' : 'viewer.jsonObject', { count: formatNumber(jsonShape.count) }) : '',
+      shape ? t(shape.kind === 'array' ? 'viewer.jsonArray' : 'viewer.jsonObject', { count: formatNumber(shape.count) }) : '',
       isMinifiedCode() ? t('viewer.minified') : '',
       isBinary() || mode() === 'tree' ? '' : t('common.lines', { count: formatNumber(lineCount(shownLines())) }),
       formatBytes(props.body.size),

@@ -24,7 +24,12 @@ export default function GraphTab() {
     if (!model) return null;
     const active = (Object.keys(kinds()) as Kind[]).filter((kind) => kinds()[kind]);
     const full = buildDependencyGraph(model, active);
-    const kept = new Set(full.nodes.toSorted((a, b) => b.calls - a.calls).slice(0, MAX_NODES).map((node) => node.id));
+    const kept = new Set(
+      full.nodes
+        .toSorted((a, b) => b.calls - a.calls)
+        .slice(0, MAX_NODES)
+        .map((node) => node.id),
+    );
     const nodes = full.nodes.filter((node) => kept.has(node.id));
     const edges = full.edges.filter((edge) => kept.has(edge.from) && kept.has(edge.to));
     return { full, nodes, edges, trimmed: full.nodes.length - nodes.length, layout: layoutGraph(nodes, edges) };
@@ -56,7 +61,12 @@ export default function GraphTab() {
             </label>
           )}
         </For>
-        <span class="text-fg-2">{t('discovery.graph.counts', { nodes: formatNumber(graph()?.nodes.length ?? 0), edges: formatNumber(graph()?.edges.length ?? 0) })}</span>
+        <span class="text-fg-2">
+          {t('discovery.graph.counts', {
+            nodes: formatNumber(graph()?.nodes.length ?? 0),
+            edges: formatNumber(graph()?.edges.length ?? 0),
+          })}
+        </span>
         <Show when={(graph()?.trimmed ?? 0) > 0}>
           <span class="text-warn">{t('discovery.graph.trimmed', { count: graph()!.trimmed })}</span>
         </Show>
@@ -70,7 +80,13 @@ export default function GraphTab() {
       <Show when={graph()?.nodes.length} fallback={<p class="p-4 text-fg-2">{t('discovery.graph.none')}</p>}>
         <div class="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_18rem]">
           <div class="min-h-0 overflow-auto p-2">
-            <svg width={graph()!.layout.width} height={graph()!.layout.height} role="img" aria-label={t('discovery.tabs.dependencies')} class="text-fg">
+            <svg
+              width={graph()!.layout.width}
+              height={graph()!.layout.height}
+              role="img"
+              aria-label={t('discovery.tabs.dependencies')}
+              class="text-fg"
+            >
               <For each={graph()!.layout.edges}>
                 {(edge) => (
                   <path
