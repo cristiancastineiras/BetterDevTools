@@ -8,7 +8,7 @@ import KeyValueSection from './KeyValueSection.tsx';
 function schemeTag(item: AuthItem): string {
   return [
     item.customScheme ?? item.scheme,
-    item.scheme === 'Bearer' && item.jwt?.ok ? 'JWT' : '',
+    item.jwt?.ok ? 'JWT' : '',
     item.basicUser !== undefined ? t('auth.user', { name: item.basicUser }) : '',
     item.source === 'response' ? t('auth.response') : '',
   ]
@@ -28,7 +28,17 @@ export default function AuthPanel(props: { items: AuthItem[]; reveal: boolean; e
   // tokens that look like JWTs get a decoded view (Bearer values lose their scheme prefix)
   const decodableTokens = createMemo(() =>
     props.items.flatMap((item) =>
-      item.jwt ? [{ item, token: item.scheme === 'Bearer' ? item.value.replace(/^bearer\s+/i, '') : item.value }] : [],
+      item.jwt
+        ? [
+            {
+              item,
+              token:
+                item.scheme === 'Bearer' || item.scheme === 'Custom'
+                  ? item.value.replace(/^([A-Za-z][\w!#$%&'*+.^`|~-]*)\s+/i, '')
+                  : item.value,
+            },
+          ]
+        : [],
     ),
   );
 

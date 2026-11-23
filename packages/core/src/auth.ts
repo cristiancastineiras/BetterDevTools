@@ -134,7 +134,15 @@ function classify(source: AuthItem['source'], h: Header, now: number): AuthItem 
   }
   if (lower === 'basic') return { source, header: h.name, scheme: 'Basic', value, basicUser: basicUser(rest.trim()) };
   if (lower === 'digest') return { source, header: h.name, scheme: 'Digest', value };
-  return { source, header: h.name, scheme: 'Custom', value, customScheme: scheme };
+  const token = rest.trim();
+  return {
+    source,
+    header: h.name,
+    scheme: 'Custom',
+    value,
+    customScheme: scheme,
+    jwt: looksLikeJwt(token) ? decodeJwt(token, now) : undefined,
+  };
 }
 
 function cookieItems(source: AuthItem['source'], h: Header, now: number): AuthItem[] {

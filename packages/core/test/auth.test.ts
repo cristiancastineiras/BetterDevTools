@@ -154,4 +154,16 @@ describe('auth detection', () => {
     expect(items[0]!.customScheme).toBe('AWS4-HMAC-SHA256');
     expect(detectAuth([{ name: 'accept', value: '*/*' }], [], [], NOW)).toEqual([]);
   });
+
+  it('decodes JWTs with OAuth and other custom Authorization schemes', () => {
+    const token = jwt({ sub: 'user:123', exp: sec(NOW) + 3600 });
+    const items = detectAuth([{ name: 'Authorization', value: `OAuth ${token}` }], [], [], NOW);
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      scheme: 'Custom',
+      customScheme: 'OAuth',
+      jwt: { ok: true },
+    });
+  });
 });
