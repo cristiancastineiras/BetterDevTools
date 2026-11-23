@@ -1,6 +1,15 @@
 // Browser adapter: the only module that touches devtools.*, permissions.*, cookies.* and
 // declarativeNetRequest.* APIs. Chrome/Edge and Firefox differences are handled here.
-import { makeBody, type Body, type BuiltRequest } from '@betterdevtools/core';
+import {
+  makeBody,
+  perfCollector,
+  PERF_READ_EXPRESSION,
+  realtimeDrainExpression,
+  realtimeHook,
+  realtimeSendExpression,
+  type Body,
+  type BuiltRequest,
+} from '@betterdevtools/core';
 import { browser, type Browser } from 'wxt/browser';
 
 export const isFirefox = import.meta.env.FIREFOX;
@@ -233,6 +242,88 @@ export async function fetchInInspectedPage(request: BuiltRequest, maxBytes: numb
     signal.removeEventListener('abort', abortInPage);
   }
 }
+
+// ------------------------------------------------------------------------ realtime channels
+
+/** The hook as the page runs it: the function's own source, called on the page's global. */
+const REALTIME_HOOK_SOURCE = `(${realtimeHook.toString()})(globalThis)`;
+
+/** Installs the hook in the inspected page (a no-op when it is already there). */
+export async function installRealtimeHook(): Promise<void> {
+  await evalInPage(REALTIME_HOOK_SOURCE);
+}
+
+/** What the hook has buffered since `after`, or null when the page has no hook (it navigated). */
+export function drainRealtime(epoch: string, after: number): Promise<unknown> {
+  return evalInPage(realtimeDrainExpression(epoch, after));
+}
+
+/**
+ * Reloads the inspected page. With the hook, Chrome runs it before any page script, so channels
+ * opened while the page loads are seen too; a browser that ignores the option installs it after load.
+ */
+export function reloadInspectedPage(withHook: boolean): void {
+  browser.devtools.inspectedWindow.reload(withHook ? { injectedScript: REALTIME_HOOK_SOURCE } : {});
+}
+
+/** Sends a message through an object the page created (WebSocket, BroadcastChannel, Worker, data channel). */
+export async function sendRealtime(id: string, part: string, text: string, asJson: boolean): Promise<{ ok: boolean; error?: string }> {
+  const reply = await evalInPage(realtimeSendExpression(id, part, text, asJson));
+  return isRecord(reply)
+    ? { ok: reply.ok === true, ...(typeof reply.error === 'string' ? { error: reply.error } : {}) }
+    : { ok: false, error: 'The page has no hook: reload it with the Reload button' };
+}
+
+// ------------------------------------------------------------------------------ page jobs
+
+/** Runs in the page: starts `run(globalThis, ...args)` and leaves its outcome under `jobId` for the panel to collect. */
+function startPageJob(jobId: string, run: (scope: unknown, ...args: unknown[]) => unknown, args: unknown[]): void {
+  const scope = globalThis as unknown as { __betterDevToolsJobs?: Record<string, unknown> };
+  const jobs = (scope.__betterDevToolsJobs ??= {});
+  jobs[jobId] = { done: false };
+  Promise.resolve()
+    .then(() => run(globalThis, ...args))
+    .then(
+      (result) => void (jobs[jobId] = { done: true, result: result === undefined ? null : result }),
+      (error: unknown) => void (jobs[jobId] = { done: true, error: String((error as { message?: unknown } | null)?.message ?? error) }),
+    );
+}
+
+const JOB_TIMEOUT_MS = 30_000;
+
+/**
+ * Runs one of the self-contained functions of core's page-scripts inside the inspected page and
+ * returns its (JSON) result. eval cannot await, so the outcome is collected with a short poll.
+ */
+export async function runPageJob<A extends unknown[], R>(run: (scope: never, ...args: A) => R | Promise<R>, ...args: A): Promise<R> {
+  const jobId = crypto.randomUUID();
+  await evalInPage(`(${startPageJob.toString()})(${JSON.stringify(jobId)}, ${run.toString()}, ${JSON.stringify(args)})`);
+  const read = `(() => { const jobs = globalThis.__betterDevToolsJobs; const job = jobs && jobs[${JSON.stringify(jobId)}]; if (!job || !job.done) return null; delete jobs[${JSON.stringify(jobId)}]; return job; })()`;
+  for (const started = Date.now(); Date.now() - started < JOB_TIMEOUT_MS;) {
+    await new Promise((resolve) => setTimeout(resolve, PAGE_POLL_MS));
+    const job = await evalInPage(read);
+    if (!isRecord(job)) continue;
+    if (typeof job.error === 'string') throw new Error(job.error);
+    return job.result as R;
+  }
+  throw new Error('The page did not answer within 30 seconds');
+}
+
+/** Evaluates a short expression in the inspected page (its URL, a selection…); the result must be JSON. */
+export const evalInInspectedPage = evalInPage;
+
+/** Shows the n-th element matching a selector in the Elements panel. */
+export async function revealElement(selector: string, index: number): Promise<void> {
+  await evalInPage(`inspect(document.querySelectorAll(${JSON.stringify(selector)})[${Math.trunc(index)}])`);
+}
+
+/** Starts the vitals observers in the page (a no-op when they are already there). */
+export async function installPerfCollector(): Promise<void> {
+  await evalInPage(`(${perfCollector.toString()})(globalThis)`);
+}
+
+/** The vitals and resource facts the collector holds, or null when the page has no collector (it navigated). */
+export const readPerf = (): Promise<unknown> => evalInPage(PERF_READ_EXPRESSION);
 
 // ------------------------------------------------------------------------- cookies in replays
 

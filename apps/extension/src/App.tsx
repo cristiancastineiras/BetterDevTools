@@ -8,8 +8,10 @@ import ConfirmDialog from './components/ConfirmDialog.tsx';
 import ContextMenu from './components/ContextMenu.tsx';
 import ExportDialog from './components/ExportDialog.tsx';
 import NetworkView from './components/NetworkView.tsx';
+import RealtimeView from './components/RealtimeView.tsx';
 import ReplayView from './components/ReplayView.tsx';
 import SaveDialog from './components/SaveDialog.tsx';
+import ToolboxView from './components/ToolboxView.tsx';
 import SettingsPanel, { setLanguage, setTheme } from './components/SettingsPanel.tsx';
 import Tabs from './components/Tabs.tsx';
 import IconButton from './components/ui/IconButton.tsx';
@@ -57,6 +59,8 @@ const VIEW_SHORTCUTS = new Map<string, View>([
   ['Digit2', 'replay'],
   ['Digit3', 'collections'],
   ['Digit4', 'discovery'],
+  ['Digit5', 'realtime'],
+  ['Digit6', 'toolbox'],
 ]);
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -120,6 +124,8 @@ export default function App() {
       { label: t('palette.goReplay'), keys: 'Alt+2', run: () => setCurrentView('replay') },
       { label: t('palette.goCollections'), keys: 'Alt+3', run: () => setCurrentView('collections') },
       { label: t('palette.goDiscovery'), keys: 'Alt+4', run: () => setCurrentView('discovery') },
+      { label: t('palette.goRealtime'), keys: 'Alt+5', run: () => setCurrentView('realtime') },
+      { label: t('palette.goToolbox'), keys: 'Alt+6', run: () => setCurrentView('toolbox') },
       { label: t('palette.settings'), run: () => showDialog({ kind: 'settings' }) },
       { label: t('palette.themeSystem'), run: () => setTheme('system') },
       { label: t('palette.themeLight'), run: () => setTheme('light') },
@@ -239,6 +245,8 @@ export default function App() {
               { id: 'replay', label: t('app.views.replay') },
               { id: 'collections', label: t('app.views.collections') },
               { id: 'discovery', label: t('app.views.discovery') },
+              { id: 'realtime', label: t('app.views.realtime') },
+              { id: 'toolbox', label: t('app.views.toolbox') },
             ]}
             end={
               <>
@@ -264,6 +272,12 @@ export default function App() {
               </Match>
               <Match when={currentView() === 'discovery'}>
                 <DiscoveryView />
+              </Match>
+              <Match when={currentView() === 'realtime'}>
+                <RealtimeView />
+              </Match>
+              <Match when={currentView() === 'toolbox'}>
+                <ToolboxView />
               </Match>
             </Switch>
           </Tabs>

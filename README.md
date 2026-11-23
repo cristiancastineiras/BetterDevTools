@@ -19,6 +19,12 @@ has no telemetry and no remote services, and it asks for no permissions at insta
 - **Inspect**: headers, query, payload, response, cookies and timing. Coloured JSON, XML/HTML, GraphQL and form views, a
   virtualized JSON tree for very large documents (search across the whole document, exact large numbers, "only
   matches", copy value or path), hex and image previews, and find-in-body.
+- **Toolbox**: 18 local tools so you do not leave DevTools for a web utility: JSON formatter, JSONPath, regex tester,
+  Base64/URL/hash/HMAC, JWT, UUID v4/v7, cURL converter, cron, epoch, URL parser, diff, webhook signature checks, and
+  page diagnostics: CORS and security findings, Core Web Vitals and a waterfall, a storage inspector (localStorage,
+  IndexedDB, Cache Storage, Service Workers, cookies) and an HTML/CSS lab.
+- **Realtime**: the channels the network list never shows: WebRTC, BroadcastChannel, Workers, Service Worker lifecycle
+  and WebTransport streams, as sessions with a timeline of their messages, filterable like requests.
 - **Replay**: edit URL, query, headers and body (table with on/off rows, or bulk text), choose a body type (JSON, text,
   JavaScript, HTML, XML, form fields, multipart, GraphQL), use `{{variables}}` from environments, send from the
   inspected page or from the extension, set a custom user agent, and diff the result against the captured response.

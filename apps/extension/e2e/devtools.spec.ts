@@ -5,58 +5,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { EXT_DIR, expect, startServer, test } from './fixtures.ts';
-
-interface Reply {
-  id: number;
-  result?: { result?: { value?: unknown }; exceptionDetails?: unknown };
-}
-
-interface Target {
-  url: string;
-  webSocketDebuggerUrl: string;
-}
-
-async function until<T>(read: () => Promise<T>, ok: (v: T) => boolean, what: string, ms = 15_000): Promise<T> {
-  const end = Date.now() + ms;
-  let last: T | undefined;
-  while (Date.now() < end) {
-    try {
-      last = await read();
-      if (ok(last)) return last;
-    } catch {
-      // target not ready yet: retry until the deadline
-    }
-    await new Promise((r) => setTimeout(r, 150));
-  }
-  throw new Error(`timed out waiting for ${what}; last value: ${JSON.stringify(last)}`);
-}
-
-async function cdp(wsUrl: string) {
-  const ws = new WebSocket(wsUrl);
-  await new Promise((resolve, reject) => {
-    ws.onopen = resolve;
-    ws.onerror = reject;
-  });
-  let seq = 0;
-  const waiting = new Map<number, (msg: Reply) => void>();
-  ws.onmessage = (m) => {
-    const msg: Reply = JSON.parse(String(m.data));
-    waiting.get(msg.id)?.(msg);
-    waiting.delete(msg.id);
-  };
-  return {
-    async eval(expression: string): Promise<unknown> {
-      const id = ++seq;
-      const msg = await new Promise<Reply>((resolve) => {
-        waiting.set(id, resolve);
-        ws.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression, awaitPromise: true, returnByValue: true } }));
-      });
-      if (msg.result?.exceptionDetails) throw new Error(JSON.stringify(msg.result.exceptionDetails));
-      return msg.result?.result?.value;
-    },
-    close: () => ws.close(),
-  };
-}
+import { cdp, until, type Target } from './real-devtools.ts';
 
 test('captures live traffic with bodies in real DevTools and keeps it across navigation', async ({ channel }) => {
   const server = await startServer();

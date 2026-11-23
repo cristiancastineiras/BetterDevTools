@@ -1,4 +1,5 @@
 import * as v from 'valibot';
+import { protocolsOf } from './protocol.ts';
 
 // HAR 1.2 entry, lenient on input (browsers omit fields) and complete on output (defaults fill the
 // required fields). looseObject keeps browser extensions such as _resourceType or _error.
@@ -78,6 +79,8 @@ export interface Captured {
   type: string;
   priority: string;
   initiator: string;
+  /** Protocol tags (`http/2`, `tls`, `graphql`, ...), see protocolsOf. */
+  protocols: string[];
   started: number;
   duration: number;
   size: number;
@@ -94,6 +97,7 @@ export function summarize(har: HarEntry, id: number, source: Source): Captured {
   const url = URL.parse(rq.url);
   const init = har._initiator;
   const initiator = typeof init === 'object' && init !== null && 'type' in init ? str0(init.type) : str0(init);
+  const protocols = protocolsOf(har);
   return {
     id,
     source,
@@ -107,12 +111,13 @@ export function summarize(har: HarEntry, id: number, source: Source): Captured {
     type: str0(har._resourceType),
     priority: str0(har._priority),
     initiator,
+    protocols,
     started: Date.parse(har.startedDateTime) || 0,
     duration: har.time,
     size: Math.max(rs.content.size, 0),
     error: str0(rs._error) || (rs.status === 0 ? 'failed' : ''),
     redirect: rs.redirectURL,
-    hay: `${rq.method} ${rq.url} ${rs.status} ${rs.content.mimeType}`.toLowerCase(),
+    hay: `${rq.method} ${rq.url} ${rs.status} ${rs.content.mimeType} ${protocols.join(' ')}`.toLowerCase(),
   };
 }
 

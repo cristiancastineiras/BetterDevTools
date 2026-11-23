@@ -5,8 +5,11 @@ import {
   exportCookies,
   isSecretCookie,
   makeBody,
+  parseSse,
+  bodyText,
   type Captured,
   type CookieExportFormat,
+  webSocketFrames,
 } from '@betterdevtools/core';
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from 'solid-js';
 import { formatNumber, t } from '../i18n/index.ts';
@@ -38,7 +41,10 @@ import MethodBadge, { StatusBadge } from './ui/MethodBadge.tsx';
 import SelectMenu from './ui/SelectMenu.tsx';
 import { monoClass, sectionTitleClass } from './ui/styles.ts';
 
-type DetailTab = 'headers' | 'payload' | 'response' | 'cookies' | 'timing';
+type DetailTab = 'headers' | 'payload' | 'response' | 'messages' | 'events' | 'cookies' | 'timing';
+
+// shortcut: renders at most this many frames without virtualising; upgrade when long sockets matter
+const MAX_FRAMES = 1000;
 
 /** Header names whose values are masked until secrets are shown. */
 const SECRET_HEADERS = new Set([...DEFAULT_REDACT.headers, 'cookie', 'set-cookie']);
@@ -80,6 +86,26 @@ export default function RequestDetail(props: { request: Captured }) {
   const cookies = createMemo(() => cookiesOf(props.request.har));
   const allCookies = createMemo(() => [...cookies().request, ...cookies().response]);
   const secretCookieCount = createMemo(() => allCookies().filter(isSecretCookie).length);
+  const frames = createMemo(() => webSocketFrames(props.request.har));
+  // an event stream's body is the whole conversation: show it as the events a browser would have delivered
+  const sseEvents = createMemo(() => {
+    bodiesVersion();
+    const body = captureLog.body(props.request.id);
+    return props.request.protocols.includes('sse') && body.text ? parseSse(bodyText(body)) : [];
+  });
+  // a request without frames has no Messages tab, so leave it when moving to one
+  createEffect(
+    () => frames().length,
+    (count) => {
+      if (!count && tab() === 'messages') setTab('headers');
+    },
+  );
+  createEffect(
+    () => sseEvents().length,
+    (count) => {
+      if (!count && tab() === 'events') setTab('headers');
+    },
+  );
 
   // "Expand all / collapse all" for the accordion sections of the Headers tab
   const [expansion, setExpansion] = createSignal({ open: true });
@@ -93,7 +119,7 @@ export default function RequestDetail(props: { request: Captured }) {
       { name: t('detail.fields.status'), value: `${request.status || '—'} ${response.statusText}`.trim() },
       ...(request.error ? [{ name: t('detail.fields.error'), value: request.error }] : []),
       ...(request.redirect ? [{ name: t('detail.fields.redirect'), value: request.redirect }] : []),
-      { name: t('detail.fields.protocol'), value: response.httpVersion || '—' },
+      { name: t('detail.fields.protocol'), value: request.protocols.join(' · ') || response.httpVersion || '—' },
       {
         name: t('detail.fields.remote'),
         value: typeof request.har.serverIPAddress === 'string' && request.har.serverIPAddress ? request.har.serverIPAddress : '—',
@@ -169,7 +195,13 @@ export default function RequestDetail(props: { request: Captured }) {
         <div class="flex items-start gap-1">
           <MethodBadge method={props.request.method} />
           <StatusBadge status={props.request.status} error={props.request.error} />
-          <span class={[monoClass, 'min-w-0 flex-1 [overflow-wrap:anywhere]']}>
+          {/* a very long URL scrolls here instead of pushing the tabs and the actions out of the pane */}
+          <span
+            role="region"
+            tabindex="0"
+            aria-label={t('detail.fields.url')}
+            class={[monoClass, 'max-h-24 min-w-0 flex-1 overflow-y-auto [overflow-wrap:anywhere]']}
+          >
             <UrlText url={props.request.url} />
           </span>
         </div>
@@ -208,6 +240,8 @@ export default function RequestDetail(props: { request: Captured }) {
             { id: 'headers', label: t('detail.tabs.headers') },
             { id: 'payload', label: t('detail.tabs.payload') },
             { id: 'response', label: t('detail.tabs.response') },
+            ...(frames().length ? [{ id: 'messages' as const, label: `${t('detail.tabs.messages')} (${frames().length})` }] : []),
+            ...(sseEvents().length ? [{ id: 'events' as const, label: `${t('detail.tabs.events')} (${sseEvents().length})` }] : []),
             {
               id: 'cookies',
               label: allCookies().length ? `${t('detail.tabs.cookies')} (${allCookies().length})` : t('detail.tabs.cookies'),
@@ -278,6 +312,58 @@ export default function RequestDetail(props: { request: Captured }) {
                 initialQuery={bodySearchText()}
                 fill
               />
+            </Match>
+
+            <Match when={tab() === 'messages'}>
+              <ol class="flex flex-col gap-1" aria-label={t('detail.messages.label')}>
+                <For each={frames().slice(0, MAX_FRAMES)}>
+                  {(frame) => (
+                    <li class="flex gap-2 border-b border-bg-3 pb-1">
+                      <span class="shrink-0 text-fg-2" title={t(`detail.messages.${frame.direction}`)}>
+                        {frame.direction === 'send' ? '↑' : '↓'}
+                        <span class="sr-only">{t(`detail.messages.${frame.direction}`)}</span>
+                      </span>
+                      <span class={[monoClass, 'shrink-0 text-fg-2']}>{new Date(frame.time * 1000).toISOString().slice(11, 23)}</span>
+                      <span class={[monoClass, 'min-w-0 flex-1 [overflow-wrap:anywhere] whitespace-pre-wrap']}>
+                        {frame.opcode === 2 ? `${t('detail.messages.binary')} ${frame.data}` : frame.data}
+                      </span>
+                    </li>
+                  )}
+                </For>
+              </ol>
+              <Show when={frames().length > MAX_FRAMES}>
+                <p class="mt-2 text-fg-2" role="note">
+                  {t('detail.messages.capped', { shown: MAX_FRAMES, total: frames().length })}
+                </p>
+              </Show>
+            </Match>
+
+            <Match when={tab() === 'events'}>
+              <ol class="flex flex-col gap-1" aria-label={t('detail.events.label')}>
+                <For each={sseEvents().slice(0, MAX_FRAMES)}>
+                  {(event) => (
+                    <li class="flex flex-col gap-0.5 border-b border-bg-3 pb-1">
+                      <div class="flex flex-wrap items-baseline gap-x-2">
+                        <span class="font-semibold">{event.event}</span>
+                        <Show when={event.id !== undefined}>
+                          <span class={[monoClass, 'text-fg-2']}>id {event.id}</span>
+                        </Show>
+                        <Show when={event.retry !== undefined}>
+                          <span class="text-fg-2">{t('detail.events.retry', { ms: event.retry ?? 0 })}</span>
+                        </Show>
+                      </div>
+                      <Show when={event.data}>
+                        <pre class={[monoClass, 'whitespace-pre-wrap [overflow-wrap:anywhere]']}>{event.data}</pre>
+                      </Show>
+                    </li>
+                  )}
+                </For>
+              </ol>
+              <Show when={sseEvents().length > MAX_FRAMES}>
+                <p class="mt-2 text-fg-2" role="note">
+                  {t('detail.messages.capped', { shown: MAX_FRAMES, total: sseEvents().length })}
+                </p>
+              </Show>
             </Match>
 
             <Match when={tab() === 'cookies'}>

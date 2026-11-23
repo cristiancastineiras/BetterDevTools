@@ -6,7 +6,7 @@ import { t } from '../i18n/index.ts';
 import { copyText, logEvent } from '../lib/io.ts';
 import { preferences } from './preferences.ts';
 
-export type View = 'network' | 'replay' | 'collections' | 'discovery';
+export type View = 'network' | 'replay' | 'collections' | 'discovery' | 'realtime' | 'toolbox';
 
 export const [currentView, setCurrentView] = createSignal<View>('network');
 

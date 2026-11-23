@@ -23,7 +23,7 @@ import { fieldClass, monoClass, sectionTitleClass } from './ui/styles.ts';
 /** Filter keys listed in the help popover (the syntax itself is not translated). */
 const FILTER_EXAMPLES =
   'method:get,post · status:404 · status:5xx · status:>=400 · domain:example.com · mime:json · type:fetch · size:>10k · ' +
-  'duration:>500ms · priority:high · initiator:script · source:import · is:error · is:redirect · body:token';
+  'protocol:graphql,grpc · protocol:h2 · duration:>500ms · priority:high · initiator:script · source:import · is:error · is:redirect · body:token';
 
 function toggleSearchBodies() {
   updatePreferences((draft) => {

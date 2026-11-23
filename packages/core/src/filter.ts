@@ -1,4 +1,5 @@
 import type { Captured } from './har.ts';
+import { PROTOCOL_ALIASES } from './protocol.ts';
 
 export type Matcher = (c: Captured) => boolean;
 
@@ -52,6 +53,13 @@ export const FILTER_FIELDS = new Map<string, Field>([
   ['type', (v) => (c) => c.type.toLowerCase() === v],
   ['duration', (v) => numeric(v, (c) => c.duration)],
   ['size', (v) => numeric(v, (c) => c.size)],
+  [
+    'protocol',
+    (v) => {
+      const wanted = v.split(',').map((name) => PROTOCOL_ALIASES[name] ?? name);
+      return (c) => wanted.some((name) => c.protocols.includes(name));
+    },
+  ],
   ['priority', (v) => (c) => c.priority.toLowerCase() === v],
   ['initiator', initiator],
   ['origin', initiator],

@@ -25,6 +25,33 @@ a per-run public key so tests know the extension id. Release builds never contai
 - Local logs (`console`, prefixed `[betterdevtools]`) are structured and pass through
   `redactDeep`, which masks secret-named fields.
 
+## The Realtime view
+
+Opening the Realtime view runs a small script in the inspected page (through `devtools.inspectedWindow.eval`, so no
+permission is added). It wraps the page's `RTCPeerConnection`, `BroadcastChannel`, `Worker`, `SharedWorker`,
+`navigator.serviceWorker` and `WebTransport` to record their events, and the panel reads them back on a short timer.
+
+- It only observes: the original function always runs with the original arguments and its result is returned
+  untouched, and a failure inside the hook is swallowed. It sees only objects created after it was installed.
+- It records message payloads, which can hold secrets. They stay in the panel's memory (the last 10,000 events) and
+  go nowhere else. **"Copy session as JSON" does not redact**; the request exporters do.
+- ICE server credentials are never read: only the server URLs are recorded.
+- What the page reports is untrusted: every event is validated with a schema and size limits before it is stored,
+  and rendered as text.
+
+## The Toolbox
+
+Every tool computes in the panel. Nothing is sent anywhere: there is no webhook receiver or request bin (they need a
+public endpoint, which this extension does not have), and the signature checker only recomputes a signature you paste.
+
+- **Page tools** (Storage, Performance, HTML & CSS selectors, Realtime) read and change the inspected page through
+  `devtools.inspectedWindow.eval`, with no added permission. Storage edits, deletes, restores and clears act on the real
+  page, and the destructive ones ask first. Snapshots hold what the page keeps, secrets included, in memory until you
+  export them: an exported file is not redacted.
+- **Captured traffic** is read, never changed, by the CORS & security and Performance tools.
+- **Regex** runs in a worker that is terminated after 1.5 seconds, so a pattern cannot freeze the panel.
+- **Secrets typed into a tool** (HMAC keys, JWT and webhook secrets) stay in that tool's fields and are never stored.
+
 ## Redaction
 
 On by default for every export and for "Copy as HAR entry": `Authorization`, `Proxy-Authorization`,

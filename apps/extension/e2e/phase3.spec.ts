@@ -232,3 +232,21 @@ test('the replay URL field colours the URL as typed, flags unknown variables and
   await expect(panel.getByRole('region', { name: 'Replay result' })).toBeVisible();
   await expect(input).toHaveText('http://127.0.0.1:1/ok');
 });
+
+test('a very long URL scrolls inside the details header and leaves the actions and tabs in view', async ({ panel }) => {
+  const longUrl = `https://api.example.com/api/user?${Array.from({ length: 400 }, (_, i) => `filter${i}=value${i}`).join('&')}`;
+  await importHar(panel, 'long.har', HAR.replace('https://api.example.com/api/user', longUrl));
+  await panel.getByRole('row', { name: /filter0=value0/ }).click();
+
+  const url = panel.getByRole('region', { name: 'URL' });
+  const box = (await url.boundingBox())!;
+  expect(box.height).toBeLessThan(150); // capped (6rem, scaled by the interface zoom), not the thousands of pixels the text needs
+  expect(await url.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  await expect(panel.getByRole('button', { name: 'Close details (Esc)' })).toBeInViewport();
+  await expect(panel.getByRole('tab', { name: 'Headers' })).toBeInViewport();
+
+  await url.focus(); // reachable by keyboard, so the rest of the URL can be read without a pointer
+  await panel.keyboard.press('End');
+  await expect.poll(() => url.evaluate((el) => el.scrollTop)).toBeGreaterThan(0); // the browser animates keyboard scrolling
+  await axe(panel, 'long URL');
+});
